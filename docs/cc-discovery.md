@@ -21,20 +21,26 @@ CC platform it has been onboarded. CC discovery:
 - discovers other CC hosts and issuers
 - publishes information about itself, onboarded issuers, and discovered cc hosts
 
-The information is published under 'did:web:<domain-name>/cc-discovery.json'
+The information is published under 'did:web:<domain-name>/discovery.json'
 
 ### Data model
 
-- version: 1.0
-- last-updated: YYYY-MM-DD-hh-mm
-- known-hosts
-  - <did:web:known-host-1>
-  - <did:web:known-host-2>
-  - <did:web:known-host-3>
-- issuers
-  - <did:web:issuer-1>
-  - <did:web:issuer-2>
-  - <did:web:issuer-3>
+JSON schema is available [here](../json-schema/discovery/2023-11/schema.json). Example:
+
+```json
+{
+  "version": 1,
+  "lastUpdated": "2023-11-05T10:00:00Z",
+  "knownHosts": [
+    "did:web:alice.com",
+    "did:web:bob.com"
+  ],
+  "issuers": [
+    "did:web:charlie.com",
+    "did:web:eve"
+  ]
+}
+```
 
 ### Resolution
 
