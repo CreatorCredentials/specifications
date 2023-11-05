@@ -23,7 +23,7 @@ CC platform it has been onboarded. CC discovery:
 
 The information is published under 'did:web:<domain-name>/cc-discovery.json'
 
-Data model
+### Data model
 
 - version: 1.0
 - last-updated: YYYY-MM-DD-hh-mm
@@ -36,7 +36,14 @@ Data model
   - <did:web:issuer-2>
   - <did:web:issuer-3>
 
-Registration protocol
+### Resolution
+
+Resolution follows the did:web schema
+
+- did:web:<domain.name> resolves to: <https://domain.name/.well-known/discovery.json>
+- did:web:<domain.name>:<path> resolves to: <https://domain.name/path/discovery.json>
+
+### Registration protocol
 
 - I need to know that the official CC platform has been set up
 - I need to register the new host
