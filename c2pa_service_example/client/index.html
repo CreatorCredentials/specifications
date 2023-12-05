@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="utf-8">
+  
+  <title>Content Credentials meet ISCC</title>
+  <meta name="description" content="Adds simple C2PA Manifest and ISCC metadata to uploaded images">
+  <meta name="author" content="Alen Horvat">
+  
+  <link rel="stylesheet" href="styles.css?v=1.0">
+</head>
+
+<h2>Content Credentials meet ISCC</h2>
+<p>Simple service to upload images, compute the ISCC code and C2PA manifest.</p>
+<p>v0.1</p>
+
+<div>
+    <input type="file" multiple
+        id="files" name="files"
+        accept="image/png, image/jpeg">
+</div>
+
+<div class="gallery"></div>
+<div class="popup">
+  <h2 class="title"></h2>
+  <p class="signer"></p>
+  <p class="time"></p>
+  <p class="producer"></p>
+  <p class="iscc"></p>
+</div>
+
+<script src="index.js"></script>
+</html>
