@@ -1,4 +1,5 @@
 import os
+import subprocess
 from datetime import datetime, timezone
 import json, jwt
 import base58, base64
@@ -316,6 +317,233 @@ def cs(key_path, file: Path):
     else:
         typer.echo(f"Invalid file path {file}")
         raise typer.Exit(code=1)
+
+manifestTemplate = {
+    "ta_url": "http://timestamp.digicert.com",
+    "claim_generator": "CAI_Demo/0.1",
+    "private_key": "./keystore/private3.key",
+    "sign_cert": "./keystore/certs3.pem",
+    "alg": "ES256",
+    
+    "assertions": [
+  ]
+}
+
+def execute_external_service(command):
+    try:
+        # Run the external service command and capture the output
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+        # Print the output of the external service
+        # print("External service output:", result.stdout)
+
+        # Return the output
+        return result.stdout
+    except subprocess.CalledProcessError as e:
+        # Handle errors if the external service command fails
+        print("Error executing external service:", e)
+        return None
+
+def add_c2pa_extension(file_path):
+    path_obj = Path(file_path)
+    # Get the file name without extension
+    file_stem = path_obj.stem
+    # Get the file extension
+    file_suffix = path_obj.suffix
+    # Add ".c2pa" before the file extension
+    new_file_name = f"{file_stem}.c2pa{file_suffix}"
+    # Create the new path with the modified file name
+    new_path = path_obj.with_name(new_file_name)
+    return new_path
+
+def add_extension(file_path, extension):
+    path_obj = Path(file_path)
+    # Get the file name without extension
+    file_stem = path_obj.stem
+    # Get the file extension
+    file_suffix = path_obj.suffix
+    # Add ".c2pa" before the file extension
+    new_file_name = f"{file_stem}.{extension}{file_suffix}"
+    # Create the new path with the modified file name
+    new_path = path_obj.with_name(new_file_name)
+    return new_path
+
+def load_manifest(file_path):
+    with open(file_path, 'r') as file:
+        json_data = json.load(file)
+    return json_data
+
+def create_iscc_metadata(file: Path, did: str):
+    """Compute the ISCC metadata for a single local file"""
+    iscc_metadata_raw = idk.code_iscc(file.as_posix())
+    iscc_metadata = vars(iscc_metadata_raw)
+    iscc_id = ic.gen_iscc_id(iscc_metadata_raw.iscc, 0, did, 0)['iscc']
+    iscc_metadata["iscc_id"] = iscc_id
+    #print("[*] ISCC ID:", iscc_id)
+    iscc_metadata["wallet"] = did
+    return remove_null_values(iscc_metadata)
+
+def sign_iscc_metadata(metadata, with_timestamp: bool, key, did):
+    """Sign the ISCC metadata"""
+    header = {}
+    timestamp_str = ""
+    if with_timestamp:
+        # TODO: fix the b64 encoding issue
+        encoded_payload = jwt.encode(metadata, key='', algorithm=None).split('.')[1]
+        tst = get_timestamp(encoded_payload)
+        tst_str = rfc3161ng.get_timestamp(tst)
+        tst_enc = base64.b64encode(tst)
+        # print("[*] Timestamp obtained")
+        timestamp_str = tst_str.strftime("%Y-%m-%dT%H:%M:%SZ")
+        header = {"sigT": timestamp_str, "tst": tst_enc.decode('utf-8'), "typ": "dades-z", "kid": did, "crit": ["sigT"], "cty": "ld+json"}
+    else:
+        timestamp_raw = datetime.utcnow()
+        timestamp_str = timestamp_raw.replace(microsecond=0, tzinfo=timezone.utc).isoformat()
+        header = {"sigT": timestamp_str, "typ": "dades-z", "kid": did, "crit": ["sigT"], "cty": "ld+json"}
+    return sign(header, metadata, key), timestamp_str.replace(":", "-")
+
+def create_c2pa_manifest(file: Path, iscc_metadata, signed_metadata, _manifest):
+    manifest = _manifest
+    # create c2pa manifest with ISCC Metadata
+    c2pa_assertion = {
+        "label": "ISCC Metadata",
+        "data": {
+            "metadata": signed_metadata,
+            "iscc": iscc_metadata["iscc"]
+        },
+        "kind": "Json"
+    }
+
+    # TODO: for some reason .append extends the manifest globally
+    manifest["assertions"] = [c2pa_assertion]
+    manifest_str = json.dumps(manifest)
+
+    cmd = ["c2patool", str(file), '--config', manifest_str, "--output", str(add_extension(file, 'c2pa')), "-f"]
+    return execute_external_service(cmd)
+
+@app.command()
+def c2pa(manifest_path, file: Path):
+    """Create signed ISCC metadata for single FILE."""
+    # Load the manifest
+    manifest = load_manifest(manifest_path)
+    print("[*] C2PA manifest is loaded")
+
+    # Load the keys
+    key = load_key(manifest["private_key"])
+    print("[*] Private key is loaded")
+
+    # Derive the DID
+    did = create_did_key(key.public_key())
+    print("[*] DID:", did)
+
+    log.remove()
+    if file.is_file() and file.exists():
+        iscc_metadata = create_iscc_metadata(file, did)
+        signed_metadata, timestamp_str = sign_iscc_metadata(iscc_metadata, False, key, did)
+        c2pa_manifest = create_c2pa_manifest(file, iscc_metadata, signed_metadata, manifest)
+
+        # store the metadata
+        file_name = str(file) + '.declaration.' + timestamp_str + '.json'
+        declaration = {
+            "iscc": iscc_metadata["iscc"],
+            "iscc_metadata": signed_metadata,
+            "c2pa_manifest": json.loads(c2pa_manifest)
+        }
+
+        with open(file_name, 'w') as json_file:
+            json.dump(declaration, json_file, indent=2)
+        print("[*] Result stored to:", file_name)
+    else:
+        typer.echo(f"Invalid file path {file}")
+        raise typer.Exit(code=1)
+
+# Global config for batch processing
+config = {
+    "did": "",
+    "key": None,
+    "with_timestamp": False,
+    "manifest": None
+}
+
+def process_file_c2pa(fp: Path):
+    idk.sdk_opts.video_store_mp7sig = True
+    try:
+        iscc_metadata = create_iscc_metadata(fp, config["did"])
+        signed_metadata, timestamp_str = sign_iscc_metadata(iscc_metadata, config["with_timestamp"], config["key"], config["did"])
+        c2pa_manifest = create_c2pa_manifest(fp, iscc_metadata, signed_metadata, config["manifest"])
+
+        # store the metadata
+        declaration = {
+            "iscc": iscc_metadata["iscc"],
+            "iscc_metadata": signed_metadata,
+            "c2pa_manifest": json.loads(c2pa_manifest)
+        }
+        return fp, True, declaration
+    except Exception as e:
+        return fp, False, e
+
+@app.command()
+def c2pabatch(manifest_path, folder: Path, workers: int = os.cpu_count()):  # pragma: no cover
+    """Create ISCC-CODEs for files in FOLDER (parallel & recursive)."""
+    if not folder.is_dir() or not folder.exists():
+        typer.echo(f"Invalid folder {folder}")
+        raise typer.Exit(1)
+
+    # Load the manifest
+    manifest = load_manifest(manifest_path)
+    print("[*] C2PA manifest is loaded")
+
+    # Load the keys
+    key = load_key(manifest["private_key"])
+    print("[*] Private key is loaded")
+
+    # Derive the DID
+    did = create_did_key(key.public_key())
+    print("[*] DID:", did)
+
+    global config
+    config = {
+        "did": did,
+        "key": key,
+        "with_timestamp": False,
+        "manifest": manifest
+    }
+
+    file_paths = []
+    file_sizes = []
+    for path, size in iter_unprocessed(folder):
+        file_paths.append(path)
+        file_sizes.append(size)
+
+    file_sizes_dict = {path: size for path, size in zip(file_paths, file_sizes)}
+    total_size = sum(file_sizes)
+    progress = Progress(
+        TextColumn("[bold blue]Processing {task.fields[dirname]}", justify="right"),
+        BarColumn(),
+        "[progress.percentage]{task.percentage:>3.1f}%",
+        "•",
+        DownloadColumn(),
+        "•",
+        TransferSpeedColumn(),
+        "•",
+        TimeRemainingColumn(),
+        console=console,
+    )
+
+    with progress:
+        task_id = progress.add_task("Processing", dirname=folder.name, total=total_size)
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(process_file_c2pa, fp) for fp in file_paths]
+            for future in as_completed(futures):
+                fp, success, result = future.result()
+                if success:
+                    log.info(f"Finished {fp.name}")
+                    out_path = Path(fp.as_posix() + ".iscc.json")
+                    with open(out_path, 'w') as json_file:
+                        json.dump(result, json_file, indent=2)
+                    log.info(f"Finished {fp.name}")
+                else:
+                    log.error(f"Failed {fp.name}: {result}")
+                progress.update(task_id, advance=file_sizes_dict[fp], refresh=True)
 
 @app.command()
 def cstst(key_path, file: Path):

@@ -1,0 +1,10 @@
+{
+    "ta_url": "http://timestamp.digicert.com",
+    "claim_generator": "CAI_Demo/0.1",
+    "private_key": "./keystore/private3.key",
+    "sign_cert": "./keystore/certs3.pem",
+    "alg": "ES256",
+    
+    "assertions": [
+  ]
+}
