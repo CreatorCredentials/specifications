@@ -1,9 +1,13 @@
+from pydantic import BaseModel
+import uvicorn
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 import os
 import subprocess
 from datetime import datetime, timezone
 import json, jwt
 import base58, base64
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from typing import Iterator, Optional, Tuple
 from loguru import logger as log
 import typer
@@ -27,6 +31,9 @@ from cryptography.hazmat.primitives import hashes
 from datetime import datetime
 import rfc3161ng
 import requests
+from PIL import Image
+import hashlib
+from io import BytesIO
 
 console = Console()
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -209,6 +216,24 @@ def sign(header, payload, private_key):
     return jws
 
 @app.command()
+def imagetranspose(file: Path):
+    try:
+        # Load the image from the file path
+        with Image.open(file) as img:
+            # Perform the specified transformation
+            rotated_img = idk.image.image_exif_transpose(img)
+
+            print(rotated_img.tobytes()[:64].hex())
+            # Compute SHA256 hash of the rotated image
+            sha256_hash = hashlib.sha256(rotated_img.tobytes()).hexdigest()
+
+            # Print the hash
+            print("SHA256 Hash:", sha256_hash)
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+@app.command()
 def createkey(file: Path):
     """Create private/public key pair and store to the defined path (e.g., key.pem)"""
     generate_and_store_key(file)
@@ -367,7 +392,24 @@ def add_extension(file_path, extension):
     new_path = path_obj.with_name(new_file_name)
     return new_path
 
+def replace_extension(file_path, extension):
+    path_obj = Path(file_path)
+    # Get the file name without extension
+    file_stem = path_obj.stem
+    # Get the file extension
+    file_suffix = path_obj.suffix
+    # Add ".c2pa" before the file extension
+    new_file_name = f"{file_stem}.{extension}"
+    # Create the new path with the modified file name
+    new_path = path_obj.with_name(new_file_name)
+    return new_path
+
 def load_manifest(file_path):
+    with open(file_path, 'r') as file:
+        json_data = json.load(file)
+    return json_data
+
+def load_json(file_path):
     with open(file_path, 'r') as file:
         json_data = json.load(file)
     return json_data
@@ -417,7 +459,7 @@ def create_c2pa_manifest(file: Path, iscc_metadata, signed_metadata, _manifest):
     manifest["assertions"] = [c2pa_assertion]
     manifest_str = json.dumps(manifest)
 
-    cmd = ["c2patool", str(file), '--config', manifest_str, "--output", str(add_extension(file, 'c2pa')), "-f"]
+    cmd = ["c2patool", str(file), '--config', manifest_str, "--output", str(add_extension(file, 'c2pa')), "-f", "-s"]
     return execute_external_service(cmd)
 
 @app.command()
@@ -435,23 +477,37 @@ def c2pa(manifest_path, file: Path):
     did = create_did_key(key.public_key())
     print("[*] DID:", did)
 
+
     log.remove()
     if file.is_file() and file.exists():
         iscc_metadata = create_iscc_metadata(file, did)
         signed_metadata, timestamp_str = sign_iscc_metadata(iscc_metadata, False, key, did)
         c2pa_manifest = create_c2pa_manifest(file, iscc_metadata, signed_metadata, manifest)
 
+        output_name = str(file) + '.declaration.' + timestamp_str + '.json'
+
+        # Load the c2pa
+        with open(replace_extension(add_extension(file, 'c2pa'), 'c2pa'), 'rb') as file:
+            file_content = file.read()
+        
+        # Encode file content to base64
+        c2pa_base64_encoded = base64.b64encode(file_content)
+        
+        # Convert bytes to string
+        c2pa_base64_string = c2pa_base64_encoded.decode('utf-8')
+
         # store the metadata
-        file_name = str(file) + '.declaration.' + timestamp_str + '.json'
+        print(file)
         declaration = {
             "iscc": iscc_metadata["iscc"],
             "iscc_metadata": signed_metadata,
-            "c2pa_manifest": json.loads(c2pa_manifest)
+            "c2pa_manifest": json.loads(c2pa_manifest),
+            "c2pa_raw": c2pa_base64_string
         }
 
-        with open(file_name, 'w') as json_file:
+        with open(output_name, 'w') as json_file:
             json.dump(declaration, json_file, indent=2)
-        print("[*] Result stored to:", file_name)
+        print("[*] Result stored to:", output_name)
     else:
         typer.echo(f"Invalid file path {file}")
         raise typer.Exit(code=1)
@@ -579,37 +635,37 @@ def cstst(key_path, file: Path):
         raise typer.Exit(code=1)
 
 @app.command()
-def register(registry_url, file_path: Path):
+def register(config_path: Path, manifest_path: Path):
     """Register the ISCC metadata to an ISCC registry"""
 
-    # Open the file in read mode
-    with open(file_path, 'r') as file:
-        # Read the entire content of the file into a string
-        file_content = file.read()
-        header = jwt.get_unverified_header(file_content)
-        payload = jwt.decode(file_content, options={"verify_signature": False})
-    print(payload)
+    # Load the config
+    config = load_json(config_path)
+    manifest = load_json(manifest_path)
+
     headers = {
     'accept': 'application/json',
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer 2023-iscc-horvat',
+    'Authorization': 'Bearer ' + config["access_token"],
     }
+    print(headers)
+    timestamp_raw = datetime.utcnow()
+    timestamp_str = timestamp_raw.replace(microsecond=0, tzinfo=timezone.utc).isoformat()
 
     data = {
-        "timestamp": header["sigT"],
+        "timestamp": timestamp_str,
         "chain_id": 0,
         "block_height": 0,
         "block_hash": "",
         "tx_idx": 0,
         "tx_hash": "",
-        "declarer": header["kid"][:32],
-        "iscc_code": payload["iscc"],
-        "message": "",
-        "meta_url": "http://"+file_content[:100],
-        "registrar": header["kid"][:32]
+        "declarer": "local",
+        "iscc_code": manifest["iscc"],
+        "message": json.dumps(manifest),
+        "meta_url": "http://",
+        "registrar": "local"
     }
 
-    url = registry_url+'/api/v1/register'
+    url = config['endpoint']+'/api/v1/register'
     try:
         response = requests.post(url, headers=headers, json=data, timeout=10)
         response.raise_for_status()  # Raise an error for bad responses (4xx, 5xx)
@@ -624,6 +680,214 @@ def timestamp():
     rt = rfc3161ng.RemoteTimestamper('https://freetsa.org/tsr')
     tst = rt.timestamp(data=b'Alice')
     print(rfc3161ng.get_timestamp(tst))
+
+
+
+# Get the number of available CPUs
+num_cpus = os.cpu_count()
+
+app2 = FastAPI()
+
+def process_image(base64_image):
+    # Replace this function with your actual image processing logic
+    # For example, decode base64, perform processing, and return result
+    decoded_image = base64.b64decode(base64_image)
+    # ... Your image processing logic here ...
+    processed_result = f"Processed: {len(decoded_image)} bytes"
+    return processed_result
+
+def base64_to_image(base64_string):
+    # Remove the base64 prefix if present
+    if base64_string.startswith('data:image'):
+        base64_string = base64_string.split(',')[-1]
+
+    # Decode the base64 string
+    image_data = base64.b64decode(base64_string)
+
+    # Create an in-memory file-like object
+    image_io = BytesIO(image_data)
+
+    # Open the image using Pillow (PIL)
+    image = Image.open(image_io)
+
+    return image
+
+def bytes_to_image(image_io):
+    # Open the image using Pillow (PIL)
+    image = Image.open(image_io)
+
+    return image
+
+def base64_to_stream(base64_string):
+    # Remove the base64 prefix if present
+    if base64_string.startswith('data:image'):
+        base64_string = base64_string.split(',')[-1]
+
+    # Decode the base64 string
+    image_data = base64.b64decode(base64_string)
+
+    # Create an in-memory file-like object
+    return BytesIO(image_data)
+
+class Request(BaseModel):
+    image: str
+
+class Response(BaseModel):
+    iscc: str
+
+@app2.post('/metadata')
+async def process_image_route(request: Request):
+    try:
+        img = base64_to_image(request.image)
+        meta = dict()
+        pixels = idk.image_normalize(img)
+        code_obj = ic.gen_image_code_v0(pixels, bits=idk.core_opts.image_bits)
+        meta.update(code_obj)
+
+        code = idk.IsccMeta.construct(**meta)
+        return Response(iscc=code.iscc)
+
+    except Exception as e:
+        return JSONResponse(content={'error': str(e)}, status_code=500)
+
+@app2.post('/v2/iscc')
+async def process_v2_iscc(request: Request):
+    try:
+        # def code_iscc_v2(stream):
+        # type: (bytes) -> idk.IsccMeta
+        """
+        Generate ISCC-CODE.
+
+        The ISCC-CODE is a composite of Meta, Content, Data and Instance Codes.
+
+        :param str fp: Filepath used for ISCC-CODE creation.
+        :return: ISCC metadata including ISCC-CODE and merged metadata from ISCC-UNITs.
+        :rtype: IsccMeta
+        """
+
+        stream = base64_to_stream(request.image)
+
+        # Generate ISCC-UNITs in parallel
+        with ThreadPoolExecutor() as executor:
+            instance = executor.submit(code_instance_v2, stream)
+            data = executor.submit(code_data_v2, stream)
+            content = executor.submit(code_content_v2, stream)
+        # instance = code_instance_v2(stream)
+        # print("instance")
+        # data = code_data_v2(stream)
+        # print("data")
+        # content = code_content_v2(stream)
+        # print("content")
+
+
+        # Wait for all futures to complete and retrieve their results
+        instance, data, content = (
+            instance.result(),
+            data.result(),
+            content.result()
+        )
+
+        # Compose ISCC-CODE
+        iscc_code = ic.gen_iscc_code_v0([content.iscc, data.iscc, instance.iscc])
+        print(iscc_code)
+        print(type(iscc_code))
+
+        # Merge ISCC Metadata
+        # iscc_meta = dict()
+        # iscc_meta.update(instance.dict())
+        # iscc_meta.update(data.dict())
+        # iscc_meta.update(content.dict())
+        # iscc_meta.update(iscc_code)
+
+        return Response(iscc=iscc_code["iscc"])
+
+    except Exception as e:
+        print('eee', e)
+        return JSONResponse(content={'error': str(e)}, status_code=500)
+    
+
+@app2.post('/v1/iscc')
+async def iscc_v1(request: Request):
+    try:
+        # Get the base64-encoded image from the request
+        base64_image = request.image
+
+        # Decode base64 image
+        image_data = base64.b64decode(base64_image)
+
+        # Calculate SHA-256 hash of the image
+        sha256_digest = hashlib.sha256(image_data).hexdigest()
+
+        # Specify the folder where you want to save the image
+        save_folder = "images"
+
+        # Create the folder if it doesn't exist
+        if not os.path.exists(save_folder):
+            os.makedirs(save_folder)
+
+        # Generate the filename based on the SHA-256 hash
+        filename = os.path.join(save_folder, f"{sha256_digest}.png")
+
+        # Save the image to the specified folder
+        with open(filename, "wb") as f:
+            f.write(image_data)
+
+        cmd = ["idk", "create", filename]
+        metadata = execute_external_service(cmd)
+        # print(metadata)
+        return Response(iscc=metadata['iscc'])
+
+    except Exception as e:
+        return JSONResponse(content={'error': str(e)}, status_code=500)
+
+def code_content_v2(stream):
+    img = bytes_to_image(stream)
+    pixels = idk.image_normalize(img)
+    meta = ic.gen_image_code_v0(pixels, bits=idk.core_opts.image_bits)
+    
+    return idk.IsccMeta.construct(**meta)
+
+## updated methods
+def code_instance_v2(stream):
+    # type: (byte) -> idk.IsccMeta
+    """
+    Create ISCC Instance-Code.
+
+    The Instance-Code is prefix of a cryptographic hash (blake3) of the input data.
+    It´s purpose is to serve as a checksum that detects even minimal changes
+    to the data of the referenced media asset. For cryptographicaly secure integrity
+    checking a full 256-bit multihash is provided with the `datahash` field.
+
+    :param str fp: Filepath used for Instance-Code creation.
+    :return: ISCC metadata including Instance-Code, datahash and filesize.
+    :rtype: IsccMeta
+    """
+
+    # Now, 'stream' can be used as a file-like object
+    meta = ic.gen_instance_code_v0(stream, bits=idk.core_opts.instance_bits)
+    return idk.IsccMeta.construct(**meta)
+
+def code_data_v2(stream):
+    # type: (str) -> idk.IsccMeta
+    """
+    Create ISCC Data-Code.
+
+    The Data-Code is a similarity preserving hash of the input data.
+
+    :param str fp: Filepath used for Data-Code creation.
+    :return: ISCC metadata including Data-Code.
+    :rtype: IsccMeta
+    """
+
+    # Now, 'stream' can be used as a file-like object
+    meta = ic.gen_data_code_v0(stream, bits=idk.core_opts.data_bits)
+
+    return idk.IsccMeta.construct(**meta)
+
+
+@app.command()
+def api(_port):
+    uvicorn.run("idk:app2", port=_port, host='127.0.0.1')
 
 if __name__ == "__main__":  # pragma: no cover
     app()
