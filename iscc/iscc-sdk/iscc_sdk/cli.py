@@ -3,7 +3,8 @@ from mpmath import mp
 import aiohttp
 import asyncio
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, Form
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 import os
 import subprocess
@@ -34,7 +35,7 @@ from cryptography.hazmat.primitives import hashes
 from datetime import datetime
 import rfc3161ng
 import requests
-from PIL import Image
+from PIL import Image, ImageEnhance
 import hashlib
 from io import BytesIO
 
@@ -740,6 +741,15 @@ class Request(BaseModel):
     image: str
     site_url: Optional[str] = None
 
+class ExplainRequest(BaseModel):
+    iscc: str
+
+class ExplainResponse(BaseModel):
+    readable: str
+    iscc: str
+    hex: str
+    log: str
+
 class Response(BaseModel):
     iscc: str
 
@@ -773,6 +783,7 @@ async def process_v2_iscc(request: Request):
         :rtype: IsccMeta
         """
         image_data = base64.b64decode(request.image)
+        print(image_data)
         digest = hashlib.sha256(image_data).hexdigest()
         stream = BytesIO(image_data)
         site_url = request.site_url
@@ -796,7 +807,65 @@ async def process_v2_iscc(request: Request):
         iscc_code = ic.gen_iscc_code_v0([content.iscc, data.iscc, instance.iscc])
 
         task = asyncio.create_task(
-            post_iscc(iscc_code['iscc'], content.iscc, data.iscc, instance.iscc, site_url, digest)
+            post_iscc(iscc_code['iscc'], content.iscc, data.iscc, instance.iscc, site_url, digest, image_data)
+        )
+
+        return Response(iscc=iscc_code["iscc"])
+
+    except Exception as e:
+        print('Error', e)
+        return JSONResponse(content={'error': str(e)}, status_code=500)
+
+    finally:
+        # Ensure background task completes even if there was an exception
+        if 'task' in locals():
+            try:
+                await task  # Wait for the background task to finish
+            except Exception as e:
+                print('Error in background task', e)
+                
+@app2.post('/v3/iscc')
+async def process_v3_iscc(url: str = Form(...), image: UploadFile = None):
+    try:
+        # def code_iscc_v2(stream):
+        # type: (bytes) -> idk.IsccMeta
+        """
+        Generate ISCC-CODE.
+
+        The ISCC-CODE is a composite of Meta, Content, Data and Instance Codes.
+
+        :param str fp: Filepath used for ISCC-CODE creation.
+        :return: ISCC metadata including ISCC-CODE and merged metadata from ISCC-UNITs.
+        :rtype: IsccMeta
+        """
+        print(url)
+        # Read the image file as bytes
+        image_bytes = await image.read()
+
+        image_data = image_bytes
+        digest = hashlib.sha256(image_data).hexdigest()
+        stream = BytesIO(image_data)
+        site_url = url
+
+        # Generate ISCC-UNITs in parallel
+        with ThreadPoolExecutor() as executor:
+            instance = executor.submit(code_instance_v2, stream)
+            data = executor.submit(code_data_v2, stream)
+            content = executor.submit(code_content_v2, stream)
+
+        # Wait for all futures to complete and retrieve their results
+        instance, data, content = (
+            instance.result(),
+            data.result(),
+            content.result()
+        )
+        print(digest)
+
+        # Compose ISCC-CODE
+        iscc_code = ic.gen_iscc_code_v0([content.iscc, data.iscc, instance.iscc])
+
+        task = asyncio.create_task(
+            post_iscc(iscc_code['iscc'], content.iscc, data.iscc, instance.iscc, site_url, digest, image_data)
         )
 
         return Response(iscc=iscc_code["iscc"])
@@ -813,7 +882,26 @@ async def process_v2_iscc(request: Request):
             except Exception as e:
                 print('Error in background task', e)
 
-async def post_iscc(iscc: str, content: str, data: str, instance: str, site_url:str, digest: str):
+img_path = "/home/alen/repo-iscc/server-db/static/img/"
+async def post_iscc(iscc: str, content: str, data: str, instance: str, site_url:str, digest: str, image_data):
+
+    # Store the thumbnail
+    output_path = img_path + iscc + ".jpg"
+    if not os.path.exists(output_path):
+        # Create an in-memory file-like object
+        image_io = BytesIO(image_data)
+        # Open the image using Pillow (PIL)
+        image = Image.open(image_io)
+
+        image.thumbnail((128, 128), resample=idk.LANCZOS)
+        # Enhance sharpness
+        enhanced_img = ImageEnhance.Sharpness(image.convert("RGB")).enhance(1.4)
+
+        # Save the processed image
+        enhanced_img.save(output_path)
+        print("Image saved")
+
+    # store to DB
     content_code = ic.Code(content)
     content_uint = content_code.hash_uint
     c_hex = content_code.hash_hex
@@ -855,6 +943,32 @@ async def post_iscc(iscc: str, content: str, data: str, instance: str, site_url:
                 print(f"Failed to store data. Status code: {response.status}")
                 print(await response.text())
 
+@app2.post('/v2/explain')
+async def explain(request: ExplainRequest):
+    try:
+        norm = ic.iscc_normalize(request.iscc)
+        decomposed = ic.iscc_decompose(norm)
+        results = []
+        for unit in decomposed:
+            code = ic.Code(unit)
+            readable = code.explain
+            data = code.hash_uint
+            d_hex = code.hash_hex
+            d_log = mp.nstr(mp.log10(data), n=decimal_places)
+
+            result = ExplainResponse(
+                    readable = readable,
+                    iscc = code.code,
+                    hex = d_hex,
+                    log = d_log
+                    )
+            results.append(jsonable_encoder(result))
+
+        return JSONResponse(content=results, status_code=200)
+    except Exception as e:
+        return JSONResponse(content={'error': str(e)}, status_code=500)
+
+
 @app2.post('/v1/iscc')
 async def iscc_v1(request: Request):
     try:
@@ -894,6 +1008,7 @@ def code_content_v2(stream):
     img = bytes_to_image(stream)
     pixels = idk.image_normalize(img)
     meta = ic.gen_image_code_v0(pixels, bits=idk.core_opts.image_bits)
+    print("meta", meta)
     
     return idk.IsccMeta.construct(**meta)
 

@@ -1,12 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"math/big"
 	"net/http"
+	"text/template"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
@@ -27,7 +33,10 @@ type Record struct {
 
 var db *sql.DB
 
+var tpl *template.Template
+
 func init() {
+	tpl = template.Must(template.ParseFiles("template/index.html"))
 	var err error
 	db, err = sql.Open("sqlite3", "./database.db")
 	if err != nil {
@@ -56,10 +65,18 @@ func init() {
 
 func main() {
 	router := gin.Default()
+	// Serve static files (styles.css in this case)
+	router.Static("/static", "./static")
+
+	router.LoadHTMLGlob("template/*")
+
+	router.GET("/", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "index.html", nil)
+	})
 
 	router.POST("/store", storeHandler)
 	router.GET("/retrieve/:iscc", retrieveHandler)
-	// router.GET("/range", rangeHandler)
+	router.GET("/getInfo", getInfoHandlerV2)
 
 	port := "8080" // Default port
 
@@ -148,4 +165,137 @@ func retrieveHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, record)
+}
+
+func getInfoHandler(c *gin.Context) {
+	isccCode := c.Query("isccCode")
+	similarityFactor := c.Query("similarityFactor")
+
+	fmt.Println(isccCode, similarityFactor)
+
+	var record Record
+	err := db.QueryRow(`
+		SELECT iscc, hash, source
+		FROM records
+		WHERE iscc = ?
+	`, isccCode).Scan(&record.Iscc, &record.Hash, &record.Source)
+
+	c.JSON(http.StatusOK, []Record{record})
+
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "Record not found"})
+		return
+	}
+}
+
+type ExplainRequest struct {
+	Iscc string `json:"iscc"`
+}
+
+type ExplainResponse struct {
+	Readble string `json:"readable"`
+	Iscc    string `json:"iscc"`
+	Hex     string `json:"hex"`
+	Log     string `json:"log"`
+}
+
+func ExplainISCC(isccCode string) ([]ExplainResponse, error) {
+	explainEndpoint := "http://localhost:3000/v2/explain" // replace with your FastAPI server URL
+	
+	// Create an ExplainRequest struct
+	explainRequest := ExplainRequest{
+		Iscc: isccCode,
+	}
+
+	// Convert ExplainRequest to JSON
+	jsonBody, err := json.Marshal(explainRequest)
+	if err != nil {
+		fmt.Println("Error marshalling JSON:", err)
+		return nil, err
+	}
+
+	// Make POST request
+	resp, err := http.Post(explainEndpoint, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		fmt.Println("Error making POST request:", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("Error reading response body:", err)
+		return nil, err
+	}
+
+	// Parse the JSON response
+	var explainResponses []ExplainResponse
+	if err := json.Unmarshal(body, &explainResponses); err != nil {
+		fmt.Println("Error parsing JSON response:", err)
+		return nil, err
+	}
+	return explainResponses, nil
+
+}
+
+func getInfoHandlerV2(c *gin.Context) {
+	isccCode := c.Query("isccCode")
+	similarityFactor := c.Query("similarityFactor")
+	fmt.Println(isccCode, similarityFactor)
+	targetValue, err := strconv.ParseFloat(similarityFactor, 64)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+	isccExplained, err := ExplainISCC(isccCode)
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+	// Loop through the ExplainResponse slice
+	var contentCode string
+	for _, response := range isccExplained {
+		// Check if Readable starts with "CONTENT"
+		if strings.HasPrefix(response.Readble, "CONTENT") {
+			contentCode = response.Log
+		}
+	}
+
+	query := `
+	    SELECT iscc, hash, instance_code_hex, content_code_hex, data_code_hex, instance_code, content_code, data_code, source
+	    FROM records
+	    WHERE ABS(content_code-?)/? < ?
+	    LIMIT 11
+	`
+
+	rows, err := db.Query(query, contentCode, contentCode, targetValue)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	var records []Record
+
+	// Process the result set
+	for rows.Next() {
+		var record Record
+		err := rows.Scan(&record.Iscc, &record.Hash, &record.InstanceCodeHex, &record.ContentCodeHex, &record.DataCodeHex, &record.InstanceCodeLog, &record.ContentCodeLog, &record.DataCodeLog, &record.Source)
+		if err != nil {
+			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+			return
+		}
+		records = append(records, record)
+	}
+
+	// Check for errors from iterating over rows
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, records)
 }

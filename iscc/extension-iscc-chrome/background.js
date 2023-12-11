@@ -36,18 +36,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 //   }
 });
 
+// V1
+// function fetchImageBytes(url, tabUrl, sendResponse) {
+//   fetch(url)
+//     .then(response => response.arrayBuffer())
+//     .then(buffer => {
+//       imageb64 = arrayBufferToBase64(buffer)
+//       // console.log(imageb64)
+//       sendBase64ToServer(imageb64, tabUrl, sendResponse)
+//       // sendResponse({ imageBytes });
+//     })
+//     .catch(error => {
+//       console.error('Error fetching image:', error);
+//       sendResponse({ error: 'Error fetching image' });
+//     });
+// }
+
+// v2
 function fetchImageBytes(url, tabUrl, sendResponse) {
   fetch(url)
     .then(response => response.arrayBuffer())
     .then(buffer => {
-      imageb64 = arrayBufferToBase64(buffer)
-      // console.log(imageb64)
-      sendBase64ToServer(imageb64, tabUrl, sendResponse)
-      // sendResponse({ imageBytes });
+      // Send the ArrayBuffer directly to the server
+      sendBytesToServer(buffer, tabUrl, sendResponse);
     })
     .catch(error => {
       console.error('Error fetching image:', error);
-      sendResponse({ error: 'Error fetching image' });
+      sendResponse({ error: error });
     });
 }
 
@@ -56,6 +71,30 @@ function arrayBufferToBase64(arrayBuffer) {
   return btoa(binaryString);
 }
 
+function sendBytesToServer(buffer, tabUrl, sendResponse) {
+  const serverEndpoint = 'http://207.154.225.251:3000/v3/iscc';
+
+  // Assuming you have a function or API to send the ArrayBuffer to the server
+  // Adjust this function according to your server communication method
+  // For example, using fetch to send the ArrayBuffer as FormData
+  const formData = new FormData();
+  formData.append('url', tabUrl);
+  formData.append('image', new Blob([buffer]));
+
+  fetch(serverEndpoint, {
+    method: 'POST',
+    body: formData,
+  })
+    .then(response => response.json())
+    .then(serverResponse => {
+      console.log('rerver Response:', serverResponse);
+      sendResponse({ 'serverResponse': serverResponse['iscc'] });
+    })
+    .catch(error => {
+      console.error('Error sending base64 image to server:', error);
+      sendResponse({ error: error.toString() });
+    });
+}
 function sendBase64ToServer(base64Image, tabUrl, sendResponse) {
   // const serverEndpoint = 'http://207.154.225.251:3000/metadata';
   // const serverEndpoint = 'http://207.154.225.251:3000/v1/iscc';

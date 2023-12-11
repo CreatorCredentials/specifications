@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISCC Info</title>
+    <link rel="stylesheet" href="static/styles.css">
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
+<body>
+
+<h1>ISCC Info</h1>
+
+<form id="infoForm">
+    <div class="form-group">
+        <label for="isccCode">ISCC Code:</label>
+        <input type="text" id="isccCode" name="isccCode" required>
+    </div>
+
+    <div class="form-group">
+        <label for="similarityFactor">Similarity Factor:</label>
+        <input type="text" id="similarityFactor" name="similarityFactor" required>
+    </div>
+
+    <button type="button" onclick="getInfo()">Get Info</button>
+</form>
+
+<table id="infoTable" border="1">
+    <thead>
+        <tr>
+            <th>ISCC Code</th>
+            <th>URL</th>
+            <th>Thumbnail</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<button type="button" onclick="clearInfo()">Clear</button>
+
+<script>
+    function getInfo() {
+        var isccCode = document.getElementById("isccCode").value;
+        var similarityFactor = document.getElementById("similarityFactor").value;
+
+        $.get("/getInfo", { isccCode: isccCode, similarityFactor: similarityFactor }, function (data) {
+            displayInfo(data);
+        });
+    }
+
+    function displayInfo(data) {
+        var infoTable = document.getElementById("infoTable").getElementsByTagName('tbody')[0];
+        infoTable.innerHTML = "";
+
+	console.log(data)
+
+        // var jsonData = JSON.parse(data);
+        var jsonData = data;
+        for (var i = 0; i < jsonData.length; i++) {
+            var row = infoTable.insertRow(i);
+            var cell1 = row.insertCell(0);
+            var cell2 = row.insertCell(1);
+            var cell3 = row.insertCell(2);
+
+            cell1.innerHTML = jsonData[i].iscc;
+            cell2.innerHTML = '<a href="' + jsonData[i].source + '">' + jsonData[i].source + '</a>';
+            cell3.innerHTML = '<img src="/static/img/' + jsonData[i].iscc + '.jpg" alt="Thumbnail">';
+        }
+    }
+
+    function clearInfo() {
+        var infoTable = document.getElementById("infoTable").getElementsByTagName('tbody')[0];
+        infoTable.innerHTML = "";
+    }
+</script>
+
+</body>
+</html>
+
