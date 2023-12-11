@@ -12,6 +12,8 @@ console.log("Image Metadata Checker Extension Loaded!");
 
 const PROCESSED_CLASS = "image-metadata-processed";
 
+const currentTabUrl = window.location.href;
+
 // Function to check if image has metadata
 function checkImageMetadata(image) {
   // Skip images that have already been processed
@@ -21,32 +23,31 @@ function checkImageMetadata(image) {
 
   // Skip images smaller than 100x100
   if (image.width < 100 || image.height < 100) {
+    image.classList.add(PROCESSED_CLASS);
     return;
   }
 
   url = image.src;
   chrome.runtime.sendMessage(
-    { action: "sendImageUrls", imgUrl: url },
+    { action: "sendImageUrls", imgUrl: url, tabUrl: currentTabUrl },
     function (response) {
+      image.classList.add(PROCESSED_CLASS);
       if (chrome.runtime.lastError) {
         // Handle the error
-        addTextOverImage(image, "X");
+        addTextOverImage(image, "Runtime Error");
         console.error("Error:", chrome.runtime.lastError);
-          image.classList.add(PROCESSED_CLASS);
         // Add logic for error handling, e.g., display an error message
       } else {
         // Process the response from the background script
 
         if (response.error) {
           // Handle the error returned by the background script
-          addTextOverImage(image, "XX");
+          addTextOverImage(image, "Response Error");
           console.error("Background script error:", response.error);
-          image.classList.add(PROCESSED_CLASS);
           // Add logic for error handling, e.g., display an error message
         } else {
           // No error, process the successful response
           addTextOverImage(image, response.serverResponse);
-          image.classList.add(PROCESSED_CLASS);
         }
       }
     }

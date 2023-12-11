@@ -7,7 +7,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Process image URLs here
     // console.log(request)
     // console.log('Received image URLs:', request.imgUrl);
-    fetchImageBytes(request.imgUrl, sendResponse)
+    fetchImageBytes(request.imgUrl, request.tabUrl, sendResponse)
     return true;
   }
 //   if (request.action === 'fetchImageBytes') {
@@ -36,13 +36,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 //   }
 });
 
-function fetchImageBytes(url, sendResponse) {
+function fetchImageBytes(url, tabUrl, sendResponse) {
   fetch(url)
     .then(response => response.arrayBuffer())
     .then(buffer => {
       imageb64 = arrayBufferToBase64(buffer)
       // console.log(imageb64)
-      sendBase64ToServer(imageb64, sendResponse)
+      sendBase64ToServer(imageb64, tabUrl, sendResponse)
       // sendResponse({ imageBytes });
     })
     .catch(error => {
@@ -56,17 +56,17 @@ function arrayBufferToBase64(arrayBuffer) {
   return btoa(binaryString);
 }
 
-function sendBase64ToServer(base64Image, sendResponse) {
+function sendBase64ToServer(base64Image, tabUrl, sendResponse) {
   // const serverEndpoint = 'http://207.154.225.251:3000/metadata';
-  const serverEndpoint = 'http://207.154.225.251:3000/v1/iscc';
-  // const serverEndpoint = 'http://207.154.225.251:3000/v2/iscc';
+  // const serverEndpoint = 'http://207.154.225.251:3000/v1/iscc';
+  const serverEndpoint = 'http://207.154.225.251:3000/v2/iscc';
 
   fetch(serverEndpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ 'image': base64Image }),
+    body: JSON.stringify({ 'image': base64Image, "site_url": tabUrl }),
   })
     .then(response => response.json())
     .then(serverResponse => {

@@ -1,4 +1,7 @@
 from pydantic import BaseModel
+from mpmath import mp
+import aiohttp
+import asyncio
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -37,6 +40,10 @@ from io import BytesIO
 
 console = Console()
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+db_url = "http://localhost:8080/store"
+# Set the desired number of decimals
+decimal_places = 20
+mp.dps = decimal_places
 
 def get_timestamp(data):
 
@@ -731,6 +738,7 @@ def base64_to_stream(base64_string):
 
 class Request(BaseModel):
     image: str
+    site_url: Optional[str] = None
 
 class Response(BaseModel):
     iscc: str
@@ -764,20 +772,17 @@ async def process_v2_iscc(request: Request):
         :return: ISCC metadata including ISCC-CODE and merged metadata from ISCC-UNITs.
         :rtype: IsccMeta
         """
-
-        stream = base64_to_stream(request.image)
+        image_data = base64.b64decode(request.image)
+        digest = hashlib.sha256(image_data).hexdigest()
+        stream = BytesIO(image_data)
+        site_url = request.site_url
+        # stream = base64_to_stream(request.image)
 
         # Generate ISCC-UNITs in parallel
         with ThreadPoolExecutor() as executor:
             instance = executor.submit(code_instance_v2, stream)
             data = executor.submit(code_data_v2, stream)
             content = executor.submit(code_content_v2, stream)
-        # instance = code_instance_v2(stream)
-        # print("instance")
-        # data = code_data_v2(stream)
-        # print("data")
-        # content = code_content_v2(stream)
-        # print("content")
 
         # Wait for all futures to complete and retrieve their results
         instance, data, content = (
@@ -785,25 +790,70 @@ async def process_v2_iscc(request: Request):
             data.result(),
             content.result()
         )
+        print(digest)
 
         # Compose ISCC-CODE
         iscc_code = ic.gen_iscc_code_v0([content.iscc, data.iscc, instance.iscc])
-        print(iscc_code)
-        print(type(iscc_code))
 
-        # Merge ISCC Metadata
-        # iscc_meta = dict()
-        # iscc_meta.update(instance.dict())
-        # iscc_meta.update(data.dict())
-        # iscc_meta.update(content.dict())
-        # iscc_meta.update(iscc_code)
+        task = asyncio.create_task(
+            post_iscc(iscc_code['iscc'], content.iscc, data.iscc, instance.iscc, site_url, digest)
+        )
 
         return Response(iscc=iscc_code["iscc"])
 
     except Exception as e:
-        print('eee', e)
+        print('Error', e)
         return JSONResponse(content={'error': str(e)}, status_code=500)
-    
+
+    finally:
+        # Ensure background task completes even if there was an exception
+        if 'task' in locals():
+            try:
+                await task  # Wait for the background task to finish
+            except Exception as e:
+                print('Error in background task', e)
+
+async def post_iscc(iscc: str, content: str, data: str, instance: str, site_url:str, digest: str):
+    content_code = ic.Code(content)
+    content_uint = content_code.hash_uint
+    c_hex = content_code.hash_hex
+    c_log = mp.nstr(mp.log10(content_uint), n=decimal_places)
+
+    data_code = ic.Code(data)
+    data_uint = data_code.hash_uint
+    d_hex = data_code.hash_hex
+    d_log = mp.nstr(mp.log10(data_uint), n=decimal_places)
+
+    instance_code = ic.Code(instance)
+    instance_uint = instance_code.hash_uint
+    i_hex = instance_code.hash_hex
+    i_log = mp.nstr(mp.log10(instance_uint), n=decimal_places)
+
+    # store to DB
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "iscc": iscc,
+        "hash": digest,
+        "instance-code-hex": i_hex,
+        "content-code-hex": c_hex,
+        "data-code-hex": d_hex,
+        "instance-code-log": i_log,
+        "content-code-log": c_log,
+        "data-code-log": d_log,
+        "source": site_url
+    }
+
+    print(data)
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(db_url, data=json.dumps(data), headers=headers) as response:
+            if response.status == 201:
+                print("Data stored successfully")
+            else:
+                print(f"Failed to store data. Status code: {response.status}")
+                print(await response.text())
 
 @app2.post('/v1/iscc')
 async def iscc_v1(request: Request):
@@ -838,6 +888,7 @@ async def iscc_v1(request: Request):
 
     except Exception as e:
         return JSONResponse(content={'error': str(e)}, status_code=500)
+
 
 def code_content_v2(stream):
     img = bytes_to_image(stream)
