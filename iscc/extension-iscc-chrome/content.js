@@ -1,7 +1,5 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log("Hi!!!");
   if (request.action === "getActiveTabUrl") {
-    console.log("Hi!!!");
     const url = window.location.href;
     sendResponse({ url });
   }
@@ -52,52 +50,7 @@ function checkImageMetadata(image) {
       }
     }
   );
-  // Mark the image as processed to avoid duplicates
-
-  // Convert the image to base64
-  // getBase64Image(image).then((base64Image) => {
-  //   // Assuming you have the server URL
-  //   const serverUrl = 'http://localhost:3000/metadata';
-
-  //   // Make a POST request to the server
-  //   fetch(serverUrl, {
-  //     method: 'POST',
-  //     headers: {
-  //       'Content-Type': 'application/json',
-  //     },
-  //     body: JSON.stringify({
-  //       image: base64Image,
-  //     }),
-  //   })
-  //     .then((response) => response.json())
-  //     .then((metadata) => {
-  //       if (metadata) {
-  // 	   addTextOverImage(image, "hello", "world");
-  //         // addTextOverImage(image);
-
-  //         // Mark the image as processed to avoid duplicates
-  //         image.classList.add(PROCESSED_CLASS);
-  //       }
-  //     })
-  //     .catch((error) => {
-  //       console.error('Error fetching metadata:', error);
-  //     });
-  // });
 }
-
-// Function to add "OK" text over the image
-// V1
-// function addTextOverImage(image) {
-//   const textElement = document.createElement('div');
-//   textElement.textContent = 'OK';
-//   textElement.style.position = 'absolute';
-//   textElement.style.top = '0';
-//   textElement.style.right = '0';
-//   textElement.style.background = 'rgba(255, 255, 255, 0.7)';
-//   textElement.style.padding = '2px';
-//   textElement.style.fontSize = '12px';
-//   image.parentElement.appendChild(textElement);
-// }
 
 // Function to add "OK" text over the image
 function addTextOverImage(image, name, type) {
@@ -183,66 +136,40 @@ function getBase64Image(img) {
 }
 
 // Function to handle intersection (scroll) events
-// function handleIntersection(entries) {
-//   entries.forEach((entry) => {
-//     if (entry.isIntersecting) {
-//       // The target is now in the viewport, check if it's an image
-//       const target = entry.target;
-//       if (target.tagName.toLowerCase() === 'img') {
-//         checkImageMetadata(target);
-//       }
-//     }
-//   });
-// }
-
-// Set up an IntersectionObserver to detect when images become visible as you scroll
-// const intersectionObserver = new IntersectionObserver(handleIntersection, {
-//   threshold: 0.5, // Adjust as needed
-// });
-
-// // Find all images on the page and observe them
-// const images = document.getElementsByTagName('img');
-// for (const image of images) {
-//   checkImageMetadata(image);
-//   intersectionObserver.observe(image);
-// }
-
-// Function to handle intersection (scroll) events
-function handleIntersection(entries) {
+function handleIntersection(entries, observer) {
   entries.forEach((entry) => {
     if (entry.isIntersecting) {
-      // The target is now in the viewport, check if it's an image
       const target = entry.target;
-      if (target.tagName.toLowerCase() === "img") {
+      if (target.tagName.toLowerCase() === "img" && !target.classList.contains("image-metadata-processed")) {
         checkImageMetadata(target);
-        // Stop observing the target after processing it (optional)
-        intersectionObserver.unobserve(target);
+        observer.unobserve(target);
       }
     }
   });
 }
 
 // Set up an IntersectionObserver to detect when images become visible as you scroll
-const intersectionObserver = new IntersectionObserver(handleIntersection, {
-  threshold: 0.5, // Adjust as needed
+const intersectionObserver = new IntersectionObserver((entries, observer) => {
+  handleIntersection(entries, observer);
+}, {
+  threshold: 0.9,
 });
+
+// Function to observe images
+function observeImages(images) {
+  images.forEach((image) => {
+    intersectionObserver.observe(image);
+  });
+}
 
 // Function to find and observe new images on the page
 function observeNewImages() {
-  const images = document.querySelectorAll(
-    "img:not(.image-metadata-processed)"
-  );
-  for (const image of images) {
-    intersectionObserver.observe(image);
-  }
+  const images = document.querySelectorAll("img:not(.image-metadata-processed)");
+  observeImages(images);
 }
 
 // Initial observation for existing images
-const existingImages = document.querySelectorAll("img");
-for (const image of existingImages) {
-  checkImageMetadata(image);
-  intersectionObserver.observe(image);
-}
+observeImages(document.querySelectorAll("img"));
 
 // Observe new images when the page loads
 observeNewImages();

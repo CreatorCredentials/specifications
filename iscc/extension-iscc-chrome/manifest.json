@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Image Fetcher",
-  "version": "1.0",
+  "version": "0.2",
   "description": "Fetches image bytes from a URL",
   "host_permissions": ["*://*/*"],
   "permissions": ["activeTab", "storage"],
@@ -10,7 +10,7 @@
     "default_icon": "icon.png"
   },
   "icons": {
-    "48": "icon.png"
+    "48": "icon.ico"
   },
   "background": {
     "service_worker": "background.js"

@@ -1,21 +1,42 @@
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Popup</title>
-  <!-- Include your popup.js file -->
-  <script src="popup.js"></script>
+  <title>Content Verifier</title>
+  <style>
+    body {
+      width: 250px;
+      text-align: center;
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 10px;
+      background-color: #f8f8f8;
+    }
+    h1 {
+      color: #333;
+      font-size: 1.5em;
+      margin-bottom: 5px;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+      margin-top: 10px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    p {
+      color: #666;
+      margin-top: 10px;
+      font-size: 0.9em;
+    }
+  </style>
 </head>
 <body>
-  <!-- Selector dropdown -->
-  <label for="endpointSelector">Select Endpoint:</label>
-  <select id="endpointSelector">
-    <option value="original">Original</option>
-    <option value="new">New</option>
-  </select>
-
-  <!-- Display the current server endpoint -->
-  <p>Current Server Endpoint: <span id="currentEndpoint">http://207.154.225.251:3000/metadata</span></p>
+  <h1>Image Verifier</h1>
+  <img src="icon.ico" alt="Logo">
+  <p>Verify Image Origin Instantly</p>
+  <p>Works with ICSS and C2PA</p>
 </body>
 </html>

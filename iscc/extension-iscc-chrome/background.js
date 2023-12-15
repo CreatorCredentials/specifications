@@ -5,65 +5,57 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'sendImageUrls' && request.imgUrl) {
     // Process image URLs here
-    // console.log(request)
-    // console.log('Received image URLs:', request.imgUrl);
     fetchImageBytes(request.imgUrl, request.tabUrl, sendResponse)
     return true;
   }
-//   if (request.action === 'fetchImageBytes') {
-// 	console.log("hi1")
-//     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-// 	console.log("hi2")
-//       const activeTab = tabs[0];
-//       if (activeTab) {
-// 	console.log("hi3", activeTab.id)
-//         chrome.tabs.sendMessage(activeTab.id, { action: 'getActiveTabUrl' }, (response) => {
-// 	console.log("hi4", response)
-//           if (response && response.url) {
-// 	console.log("hi5")
-//             console.log(fetchImageBytes(response.url, sendResponse));
-//           } else {
-//             sendResponse({ error: 'Unable to get active tab URL' });
-//           }
-//         });
-//       } else {
-//         sendResponse({ error: 'No active tab found' });
-//       }
-//     });
-//     return true; // Keeps the message channel open for asynchronous responses
-//   } else {
-//     sendResponse({ error: 'Invalid message' });
-//   }
 });
 
-// V1
-// function fetchImageBytes(url, tabUrl, sendResponse) {
-//   fetch(url)
-//     .then(response => response.arrayBuffer())
-//     .then(buffer => {
-//       imageb64 = arrayBufferToBase64(buffer)
-//       // console.log(imageb64)
-//       sendBase64ToServer(imageb64, tabUrl, sendResponse)
-//       // sendResponse({ imageBytes });
-//     })
-//     .catch(error => {
-//       console.error('Error fetching image:', error);
-//       sendResponse({ error: 'Error fetching image' });
-//     });
-// }
-
-// v2
+// v3
 function fetchImageBytes(url, tabUrl, sendResponse) {
   fetch(url)
     .then(response => response.arrayBuffer())
-    .then(buffer => {
-      // Send the ArrayBuffer directly to the server
-      sendBytesToServer(buffer, tabUrl, sendResponse);
+    .then(async buffer => {
+      // Compute SHA-256 hash of the ArrayBuffer
+      const hash = await computeArrayBufferSha256(buffer);
+      const [ exists, iscc ] = await checkHashExistsOnServer(hash);
+      // console.log(hash, exists, iscc);
+      if (!exists) {
+        // Hash not found, send the ArrayBuffer and hash to the server
+        sendBytesToServer(buffer, tabUrl, sendResponse);
+      } else {
+        // console.log('Hash already exists on the server. Skipping upload.');
+        sendResponse({ 'serverResponse': iscc });
+      }
     })
     .catch(error => {
-      console.error('Error fetching image:', error);
-      sendResponse({ error: error });
+      // console.error('Error fetching image:', error);
+      sendResponse({ error: 'Error fetching image' });
     });
+}
+
+// Function to compute SHA-256 hash of an ArrayBuffer
+async function computeArrayBufferSha256(arrayBuffer) {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+}
+
+// Function to check if hash exists on the server
+async function checkHashExistsOnServer(hash) {
+  const serverEndpoint = `http://207.154.225.251:8003/v3/records?hash=${hash}`;
+
+  try {
+    const response = await fetch(serverEndpoint);
+    if (response.ok) {
+      let responseData = await response.json()
+      // console.log(responseData)
+      return [response.ok, responseData.data.iscc]
+    }
+    return [response.ok, null];
+  } catch {
+    return [false, null];
+  }
 }
 
 function arrayBufferToBase64(arrayBuffer) {
@@ -72,7 +64,7 @@ function arrayBufferToBase64(arrayBuffer) {
 }
 
 function sendBytesToServer(buffer, tabUrl, sendResponse) {
-  const serverEndpoint = 'http://207.154.225.251:3000/v3/iscc';
+  const serverEndpoint = 'http://207.154.225.251:8002/v3/iscc';
 
   // Assuming you have a function or API to send the ArrayBuffer to the server
   // Adjust this function according to your server communication method
@@ -87,33 +79,11 @@ function sendBytesToServer(buffer, tabUrl, sendResponse) {
   })
     .then(response => response.json())
     .then(serverResponse => {
-      console.log('rerver Response:', serverResponse);
+      // console.log('rerver Response:', serverResponse);
       sendResponse({ 'serverResponse': serverResponse['iscc'] });
     })
     .catch(error => {
-      console.error('Error sending base64 image to server:', error);
+      // console.error('Error sending base64 image to server:', error);
       sendResponse({ error: error.toString() });
-    });
-}
-function sendBase64ToServer(base64Image, tabUrl, sendResponse) {
-  // const serverEndpoint = 'http://207.154.225.251:3000/metadata';
-  // const serverEndpoint = 'http://207.154.225.251:3000/v1/iscc';
-  const serverEndpoint = 'http://207.154.225.251:3000/v2/iscc';
-
-  fetch(serverEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ 'image': base64Image, "site_url": tabUrl }),
-  })
-    .then(response => response.json())
-    .then(serverResponse => {
-      console.log('rerver Response:', serverResponse);
-      sendResponse({ 'serverResponse': serverResponse['iscc'] });
-    })
-    .catch(error => {
-      console.error('Error sending base64 image to server:', error);
-      // sendResponse({ error: 'Error sending base64 image to server' });
     });
 }
