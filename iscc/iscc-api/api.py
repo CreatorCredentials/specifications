@@ -145,8 +145,15 @@ def code_instance_v2(stream: BytesIO):
     return idk.IsccMeta.construct(**meta)
 
 
-async def post_iscc(db_url: str,
-    iscc: str, content: str, data: str, instance: str, site_url: str, digest: str, image_data
+async def post_iscc(
+    db_url: str,
+    iscc: str,
+    content: str,
+    data: str,
+    instance: str,
+    site_url: str,
+    digest: str,
+    image_data,
 ):
     """
     Store information in a local DB
@@ -184,8 +191,15 @@ async def post_iscc(db_url: str,
     i_hex = instance_code.hash_hex
     i_log = mp.nstr(mp.log10(instance_uint), n=DECIMAL_PLACES)
 
-    # store to DB
-    headers = {"Content-Type": "application/json"}
+    # check c2pa
+    # statement indices: (c2pa, iptc, tdmai, iscc declaration)
+    success = await post_c2pa_image(image_data)
+    iscc_declaration = "0"  # not present
+    tdmai = "0"  # not present
+    iptc = "0"  # not present
+    c2pa = "0"  # not present
+    if success:
+        c2pa = "1"
     data = {
         "iscc": iscc,
         "hash": digest,
@@ -196,37 +210,40 @@ async def post_iscc(db_url: str,
         "content-code-log": c_log,
         "data-code-log": d_log,
         "source": site_url,
+        "statements": int(c2pa + iptc + tdmai + iscc_declaration, 2)
     }
-
     print(data)
 
+    # store to DB
+    headers = {"Content-Type": "application/json"}
     async with aiohttp.ClientSession() as session:
-        async with session.post(db_url, data=json.dumps(data), headers=headers) as response:
+        async with session.post(
+            db_url, data=json.dumps(data), headers=headers
+        ) as response:
             if response.status == 201:
                 print("Data stored successfully")
             else:
                 print(f"Failed to store data. Status code: {response.status}")
                 print(await response.text())
-    
-    await post_c2pa_image(image_data)
+
 
 async def post_c2pa_image(image_bytes):
-    url = 'http://localhost:8001/v1/c2pa'
+    url = "http://localhost:8001/v1/c2pa"
 
     headers = {
-        'Content-Type': 'image/png',
+        "Content-Type": "image/png",
     }
 
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, data=image_bytes) as response:
             # Check the response
             if response.status == 200:
-                print('POST request successful')
-                print('Response:', await response.text())
+                print("POST request successful")
+                return True
             else:
-                print(f'POST request failed with status code {response.status}')
-                print('Response:', await response.text())
-
+                print(f"POST request failed with status code {response.status}")
+                print("Response:", await response.text())
+                return False
 
 def create_directory_if_not_exists(directory_path):
     try:
@@ -258,18 +275,21 @@ async def explain(request: ExplainRequest):
             d_hex = code.hash_hex
             d_log = mp.nstr(mp.log10(data), n=DECIMAL_PLACES)
 
-            result = ExplainResponse(readable=readable, iscc=code.code, hex=d_hex, log=d_log)
+            result = ExplainResponse(
+                readable=readable, iscc=code.code, hex=d_hex, log=d_log
+            )
             results.append(jsonable_encoder(result))
 
         return JSONResponse(content=results, status_code=200)
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
+
 async def get_iscc_by_digest(digest: str):
     schema = get_required_env_variable("REGISTRY_SCHEMA")
     hostname = get_required_env_variable("REGISTRY_HOST_PORT")
     endpoint = get_required_env_variable("REGISTRY_API_RECORDS")
-    url_components = (schema, hostname, endpoint,'', urlencode({'digest': digest})  ,'')
+    url_components = (schema, hostname, endpoint, "", urlencode({"hash": digest}), "")
     url = urlunparse(url_components)
 
     async with aiohttp.ClientSession() as session:
@@ -301,8 +321,8 @@ async def process_v3_iscc(url: str = Form(...), image: UploadFile = None):
         # Check if the fetch was successful
         if result is not None:
             r = json.loads(result)
-            if 'data' in r:
-                return Response(iscc=r['data']["iscc"])
+            if "data" in r:
+                return Response(iscc=r["data"]["iscc"])
 
         stream = BytesIO(image_data)
         site_url = url
@@ -347,11 +367,13 @@ async def process_v3_iscc(url: str = Form(...), image: UploadFile = None):
             except Exception as e:
                 print("Error in background task", e)
 
+
 def get_required_env_variable(variable_name):
     value = os.getenv(variable_name)
     if value is None:
         raise ValueError(f"Environment variable {variable_name} is not set.")
     return str(value)
+
 
 def main():
     global DB_URL
@@ -372,14 +394,16 @@ def main():
     iscc_host = get_required_env_variable("ISCC_HOST")
     iscc_port = get_required_env_variable("ISCC_PORT")
 
-    parser = argparse.ArgumentParser(description="ISCC API v0.1")
+    parser = argparse.ArgumentParser(description="ISCC API v0.2")
     # Add command-line arguments
-    parser.add_argument("--path", type=str, default=IMG_PATH, help="Path to static file store")
-    parser.add_argument("--port", type=int, default=iscc_port, help="ISCC API port number")
-    parser.add_argument("--host", type=str, default=iscc_host, help="ISCC host")
     parser.add_argument(
-        "--db", type=str, default=DB_URL, help="Local DB URL argument"
+        "--path", type=str, default=IMG_PATH, help="Path to static file store"
     )
+    parser.add_argument(
+        "--port", type=int, default=iscc_port, help="ISCC API port number"
+    )
+    parser.add_argument("--host", type=str, default=iscc_host, help="ISCC host")
+    parser.add_argument("--db", type=str, default=DB_URL, help="Local DB URL argument")
 
     # Parse command-line arguments
     args = parser.parse_args()

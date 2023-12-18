@@ -24,9 +24,11 @@ type Record struct {
 	ContentCodeLog  string `json:"content-code-log"`
 	DataCodeLog     string `json:"data-code-log"`
 	Source          string `json:"source"`
+	Statements      int    `json:"statements"`
 }
 
 var db *sql.DB
+var vDb *sql.DB
 
 func init() {
 	var err error
@@ -66,7 +68,39 @@ func init() {
 			instance_code REAL,
 			content_code REAL,
 			data_code REAL,
-			source TEXT
+			source TEXT,
+			statements INTEGER
+		)
+	`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create Verifiable DB
+	vDbName := os.Getenv("V_DB_NAME")
+	vDbPath := filepath.Join(dbDir, vDbName)
+	log.Println("vDbPath:", vDbPath)
+
+	// Open DB
+	vDb, err = sql.Open("sqlite3", vDbPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create the table if it doesn't exist
+	_, err = vDb.Exec(`
+		CREATE TABLE IF NOT EXISTS records (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			iscc TEXT,
+			hash TEXT,
+			instance_code_hex TEXT,
+			content_code_hex TEXT,
+			data_code_hex TEXT,
+			instance_code REAL,
+			content_code REAL,
+			data_code REAL,
+			source TEXT,
+			statements INTEGER
 		)
 	`)
 	if err != nil {
@@ -122,17 +156,29 @@ func storeHandler(c *gin.Context) {
 	}
 	dataCode, _ := _dataCode.Float64()
 	// Insert the record into the database
-	_, err := db.Exec(`
-		INSERT INTO records (iscc, hash, instance_code_hex, content_code_hex, data_code_hex, instance_code, content_code, data_code, source)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, record.Iscc, record.Hash, record.InstanceCodeHex, record.ContentCodeHex, record.DataCodeHex, instanceCode, contentCode, dataCode, record.Source)
+	if record.Statements > 0 {
+		_, err := vDb.Exec(`
+		INSERT INTO records (iscc, hash, instance_code_hex, content_code_hex, data_code_hex, instance_code, content_code, data_code, source, statements)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, record.Iscc, record.Hash, record.InstanceCodeHex, record.ContentCodeHex, record.DataCodeHex, instanceCode, contentCode, dataCode, record.Source, record.Statements)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store data in the database"})
+			log.Println(err)
+			return
+		}
+	}
+	result, err := db.Exec(`
+		INSERT INTO records (iscc, hash, instance_code_hex, content_code_hex, data_code_hex, instance_code, content_code, data_code, source, statements)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, record.Iscc, record.Hash, record.InstanceCodeHex, record.ContentCodeHex, record.DataCodeHex, instanceCode, contentCode, dataCode, record.Source, record.Statements)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store data in the database"})
 		log.Println(err)
 		return
 	}
+	id, _ := result.LastInsertId()
 
-	c.JSON(http.StatusCreated, gin.H{"message": "Data stored successfully"})
+	c.JSON(http.StatusCreated, gin.H{"message": "Data stored", "id": id})
 }
 
 func createDirectoryIfNotExist(dirPath string) error {
@@ -152,6 +198,5 @@ func createDirectoryIfNotExist(dirPath string) error {
 		// Directory already exists
 		log.Println("Directory already exists:", dirPath)
 	}
-
 	return nil
 }

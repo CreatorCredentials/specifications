@@ -1,6 +1,6 @@
 [package]
 name = "c2pa-api"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -12,3 +12,4 @@ sha256 = "1.4.0"
 c2pa = "0.28.1"
 clap = "4.4.11"
 dotenv = "0.15.0"
+image = "0.24.7"

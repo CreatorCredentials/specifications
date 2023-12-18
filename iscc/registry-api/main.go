@@ -30,9 +30,11 @@ type Record struct {
 	ContentCodeLog  string `json:"content-code-log"`
 	DataCodeLog     string `json:"data-code-log"`
 	Source          string `json:"source"`
+	Statements      int    `json:"statements"`
 }
 
 var db *sql.DB
+var vDb *sql.DB
 var explainEndpoint string
 
 func init() {
@@ -60,6 +62,9 @@ func main() {
 	dbPath := filepath.Join(dbDir, dbName)
 	log.Println("dbPath:", dbPath)
 
+	vDbName := os.Getenv("V_DB_NAME")
+	vDbPath := filepath.Join(dbDir, vDbName)
+
 	// Connection URL for SQLite in read-only mode
 	// connectionURL := fmt.Sprintf("file:%s?mode=ro", dbPath)
 
@@ -71,6 +76,12 @@ func main() {
 		return
 	}
 	defer db.Close()
+	vDb, err = sql.Open("sqlite3", vDbPath)
+	if err != nil {
+		fmt.Println("Error opening the database:", err)
+		return
+	}
+	defer vDb.Close()
 
 	// Set GIN to release/debug mode
 	debug := os.Getenv("DEBUG")
@@ -99,6 +110,9 @@ func main() {
 	// Handle /records?digest={hex sha256 digest-value}
 	router.GET("/v3/records", getRecordsFilterV3)
 
+	// Handle /records?digest={hex sha256 digest-value}
+	router.GET("/v4/records", getRecordsFilterV4)
+
 	log.Printf("Server listening on :%s...\n", hostPort)
 	log.Fatal(router.Run(hostPort))
 }
@@ -120,25 +134,42 @@ func getRecordsFilterV3(c *gin.Context) {
 	}
 }
 
+func getRecordsFilterV4(c *gin.Context) {
+	getSimilarByIsccV1(c)
+}
+
+func getSimilarByIsccV1(c *gin.Context) {
+	iscc := c.Query("iscc")
+	similarity := c.Query("similarity")
+	records, err := getSimilar(iscc, similarity)
+	// Check for errors from iterating over rows
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"exists": true, "records": records})
+}
+
 func getRecordsByDigestV3(c *gin.Context) {
 	hash := c.Query("hash")
 	log.Println(hash)
 
 	var record Record
 	err := db.QueryRow(`
-		SELECT iscc, hash
+		SELECT iscc, hash, statements
 		FROM records
 		WHERE hash = ?
-	`, hash).Scan(&record.Iscc, &record.Hash)
+	`, hash).Scan(&record.Iscc, &record.Hash, &record.Statements)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Hash does not exist
-			c.JSON(http.StatusOK, gin.H{"exists": false})
+			c.JSON(http.StatusNotFound, gin.H{"exists": false, "error": "Not Found"})
 		} else {
 			// Handle other errors
 			fmt.Println(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+			c.JSON(http.StatusInternalServerError, gin.H{"exists": false, "error": "Internal Server Error"})
 		}
 		return
 	}
@@ -153,10 +184,10 @@ func getRecordsIsccV3(c *gin.Context) {
 
 	var record Record
 	err := db.QueryRow(`
-		SELECT iscc, hash, instance_code_hex, content_code_hex, data_code_hex,instance_code, content_code, data_code, source
+		SELECT iscc, hash, instance_code_hex, content_code_hex, data_code_hex,instance_code, content_code, data_code, source, statements
 		FROM records
 		WHERE iscc = ?
-	`, iscc).Scan(&record.Iscc, &record.Hash, &record.InstanceCodeHex, &record.ContentCodeHex, &record.DataCodeHex, &record.InstanceCodeLog, &record.ContentCodeLog, &record.DataCodeLog, &record.Source)
+	`, iscc).Scan(&record.Iscc, &record.Hash, &record.InstanceCodeHex, &record.ContentCodeHex, &record.DataCodeHex, &record.InstanceCodeLog, &record.ContentCodeLog, &record.DataCodeLog, &record.Source, &record.Statements)
 
 	if err != nil {
 		fmt.Println(err)
@@ -238,18 +269,29 @@ func ExplainISCC(isccCode string) ([]ExplainResponse, error) {
 func getRecordsBySimilarityV3(c *gin.Context) {
 	isccCode := c.Query("iscc")
 	similarityFactor := c.Query("similarity")
+
+	records, err := getSimilar(isccCode, similarityFactor)
+
+	// Check for errors from iterating over rows
+	if err != nil {
+		log.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, records)
+}
+func getSimilar(isccCode, similarityFactor string) ([]Record, error) {
 	fmt.Println(isccCode, similarityFactor)
 	targetValue, err := strconv.ParseFloat(similarityFactor, 64)
 	if err != nil {
 		log.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, err
 	}
 	isccExplained, err := ExplainISCC(isccCode)
 	if err != nil {
 		log.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return nil, err
 	}
 	// Loop through the ExplainResponse slice
 	var contentCode string
@@ -261,16 +303,15 @@ func getRecordsBySimilarityV3(c *gin.Context) {
 	}
 
 	query := `
-	    SELECT iscc, hash, instance_code_hex, content_code_hex, data_code_hex, instance_code, content_code, data_code, source
+	    SELECT iscc, hash, instance_code_hex, content_code_hex, data_code_hex, instance_code, content_code, data_code, source, statements
 	    FROM records
 	    WHERE ABS(content_code-?)/? < ?
 	    LIMIT 11
 	`
-	rows, err := db.Query(query, contentCode, contentCode, targetValue)
+	rows, err := vDb.Query(query, contentCode, contentCode, targetValue)
 	if err != nil {
 		log.Println(err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "Internal Server Error"})
-		return
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -279,21 +320,13 @@ func getRecordsBySimilarityV3(c *gin.Context) {
 	// Process the result set
 	for rows.Next() {
 		var record Record
-		err := rows.Scan(&record.Iscc, &record.Hash, &record.InstanceCodeHex, &record.ContentCodeHex, &record.DataCodeHex, &record.InstanceCodeLog, &record.ContentCodeLog, &record.DataCodeLog, &record.Source)
+		err := rows.Scan(&record.Iscc, &record.Hash, &record.InstanceCodeHex, &record.ContentCodeHex, &record.DataCodeHex, &record.InstanceCodeLog, &record.ContentCodeLog, &record.DataCodeLog, &record.Source, &record.Statements)
 		if err != nil {
-			log.Fatal(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-			return
+			log.Println(err)
+			return nil, err
 		}
 		records = append(records, record)
 	}
 
-	// Check for errors from iterating over rows
-	if err := rows.Err(); err != nil {
-		log.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-		return
-	}
-
-	c.JSON(http.StatusOK, records)
+	return records, err
 }

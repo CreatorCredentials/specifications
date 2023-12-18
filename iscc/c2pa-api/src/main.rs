@@ -2,11 +2,13 @@ use actix_web::{post, web, App, HttpRequest, HttpResponse, HttpServer};
 use bytes::Bytes;
 use c2pa::jumbf_io;
 use clap::{Arg, Command};
-use sha256::digest;
-use std::fs;
-use std::path::Path;
-use std::env;
 use dotenv::from_filename;
+use image::io::Reader as ImageReader;
+use sha256::digest;
+use std::env;
+use std::fs;
+use std::io;
+use std::path::Path;
 
 #[derive(Clone)]
 struct AppState {
@@ -24,20 +26,14 @@ async fn handle_post_request(
     // Compute SHA-256 hash
     let hash_result = digest(payload_bytes);
     // Print the SHA-256 hash
-    // println!("SHA-256 Hash: {}", hash_result);
+    println!("SHA-256 Hash: {}", hash_result);
 
     let image_bytes: &[u8] = payload_bytes;
+    // detect image bytes
+    // Store the result in a variable
+    let asset_type: String = detect_image_format(&image_bytes);
 
-    // Process the image_bytes as needed
-    let content_type: Option<String> =
-        if let Some(content_type) = _req.headers().get("content-type") {
-            content_type.to_str().ok().map(String::from)
-        } else {
-            None
-        };
-    // println!("{:#?}", content_type);
-    let asset_type = content_type.unwrap();
-    let result = jumbf_io::load_jumbf_from_memory(&asset_type.to_string(), &image_bytes);
+    let result = jumbf_io::load_jumbf_from_memory(&asset_type, &image_bytes);
 
     match result {
         Ok(manifest) => {
@@ -141,4 +137,20 @@ async fn main() -> std::io::Result<()> {
 fn create_folder_if_not_exists(folder_path: &str) -> std::io::Result<()> {
     fs::create_dir_all(folder_path)?;
     Ok(())
+}
+
+fn detect_image_format(data: &[u8]) -> String {
+    // Create an image reader from the byte data
+    let reader = ImageReader::new(io::Cursor::new(data));
+    match reader.with_guessed_format()
+     {
+        Ok(guess) =>  {
+            let format = guess.format();
+            match format {
+                Some(f) => format!("{:?}", f),
+                None => String::new()
+            }
+        },
+        Err(_guess) => String::new()
+    }
 }

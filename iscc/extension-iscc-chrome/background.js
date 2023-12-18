@@ -17,19 +17,26 @@ function fetchImageBytes(url, tabUrl, sendResponse) {
     .then(async buffer => {
       // Compute SHA-256 hash of the ArrayBuffer
       const hash = await computeArrayBufferSha256(buffer);
-      const [ exists, iscc ] = await checkHashExistsOnServer(hash);
-      // console.log(hash, exists, iscc);
+      const [exists, record] = await checkHashExistsOnServer(hash);
+      console.log("xx", record)
       if (!exists) {
         // Hash not found, send the ArrayBuffer and hash to the server
         sendBytesToServer(buffer, tabUrl, sendResponse);
       } else {
-        // console.log('Hash already exists on the server. Skipping upload.');
-        sendResponse({ 'serverResponse': iscc });
+        if (record.statements > 0) {
+          sendResponse({ 'serverResponse': record });
+        }
+        const [exists, records] = await checkSimilarExistsOnServer(record.iscc);
+        if (exists) {
+          sendResponse({ 'serverResponse': records[0] });
+          console.log("I'm new", records)
+        } else {
+          sendResponse({ error: 'Error fetching metadata' });
+        }
       }
     })
     .catch(error => {
-      // console.error('Error fetching image:', error);
-      sendResponse({ error: 'Error fetching image' });
+      sendResponse({ error: 'Error fetching image:' + error.toString() });
     });
 }
 
@@ -44,15 +51,28 @@ async function computeArrayBufferSha256(arrayBuffer) {
 // Function to check if hash exists on the server
 async function checkHashExistsOnServer(hash) {
   const serverEndpoint = `http://207.154.225.251:8003/v3/records?hash=${hash}`;
-
   try {
     const response = await fetch(serverEndpoint);
     if (response.ok) {
       let responseData = await response.json()
-      // console.log(responseData)
-      return [response.ok, responseData.data.iscc]
+      return [responseData.exists, responseData.data]
     }
-    return [response.ok, null];
+    return [false, null];
+  } catch {
+    return [false, null];
+  }
+}
+
+// Function to check if hash exists on the server
+async function checkSimilarExistsOnServer(iscc) {
+  const serverEndpoint = `http://207.154.225.251:8003/v4/records?iscc=${iscc}&similarity=0.000001`;
+  try {
+    const response = await fetch(serverEndpoint);
+    if (response.ok) {
+      let responseData = await response.json()
+      return [responseData.exists, responseData.records]
+    }
+    return [false, null];
   } catch {
     return [false, null];
   }
@@ -77,13 +97,47 @@ function sendBytesToServer(buffer, tabUrl, sendResponse) {
     method: 'POST',
     body: formData,
   })
-    .then(response => response.json())
+    .then(response => {
+      console.log(response);
+      return response.json()
+    }
+    )
     .then(serverResponse => {
-      // console.log('rerver Response:', serverResponse);
-      sendResponse({ 'serverResponse': serverResponse['iscc'] });
+      // Use the serverResponse as needed
+      console.log('server response', serverResponse)
+
+      // Call checkSimilarExistsOnServer with the desired parameter (for example, serverResponse.iscc)
+      return checkSimilarExistsOnServer(serverResponse.iscc);
+    })
+    .then(([exists, records]) => {
+      // Process the result of checkSimilarExistsOnServer
+      console.log('Exists on server:', exists);
+      console.log('Records:', records);
+      // Continue with the rest of your code if needed
+      if (exists) {
+        sendResponse({ 'serverResponse': records[0] });
+        console.log("I'm new", records)
+      } else {
+        sendResponse({ error: 'Error fetching metadata!' });
+      }
     })
     .catch(error => {
-      // console.error('Error sending base64 image to server:', error);
+      console.log("I'm new error", error.toString())
+      // Handle any errors in the chain
       sendResponse({ error: error.toString() });
     });
+
+  /*
+  fetch(serverEndpoint, {
+    method: 'POST',
+    body: formData,
+  })
+    .then(response => response.json())
+    .then(serverResponse => {
+      sendResponse({ 'serverResponse': serverResponse });
+    })
+    .catch(error => {
+      sendResponse({ error: error.toString() });
+    });
+    */
 }
