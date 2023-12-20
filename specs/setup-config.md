@@ -1,14 +1,14 @@
 # Setup and configuration
 
 - [Setup and configuration](#setup-and-configuration)
+  - [Overview](#overview)
   - [Host](#host)
   - [Initialisation](#initialisation)
   - [Host private-public key generation and storage](#host-private-public-key-generation-and-storage)
-  - [Instructions for hosts](#instructions-for-hosts)
-    - [How to configure](#how-to-configure)
-    - [How to deploy](#how-to-deploy)
 
-In CC we have three roles
+## Overview
+
+In CC we identify three roles: host, issuer and creator.
 
 - Host - entity that hosts the application
   - Signs/issues Verification VCs to Issuers and Creators
@@ -54,8 +54,6 @@ Before deploying the solution, the host must configure
 - database location
 - other (to be updated)
 
-TODO: define how to configure the solution
-
 ## Host private-public key generation and storage
 
 The host application must generate an EC secp256r1 (alternative names: P-256, prime256v1) key pair. Any [library](https://jwt.io/libraries) supporting ES256 signature should be capable of generating such a key pair. The key pair must be accessible to the host application for the purpose of issuing Verification VCs.
@@ -72,13 +70,3 @@ The private key can be stored
 Suggestion: begin with plaintext local file with limited access rights or .env/ENV
 
 Example using OpenSSL: see the [examples/gen-unencrypted.sh](./examples/gen-unencrypted.sh)
-
-## Instructions for hosts
-
-### How to configure
-
-TBD
-
-### How to deploy
-
-TBD

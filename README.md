@@ -1,14 +1,40 @@
-# CC Specifications
+# CreatorCredentials
 
-This folder contains core CC specifications.
+CreatorCredentials is an application for media organisations to issue Verifiable
+Credentials to creators.
 
-Titles marked with (wip) are subject to change.
+## Get started (wip)
 
-## Table of contents
+### Build
 
-- [CC platform setup and configuration](setup-config.md)
-- [DID web for Issuer Portal](did.md)
-- [JSON Schema and examples of Verification VCs](../json-schema/verification-credentials/)
+In this section we summarise how to build the CreatorCredentials app.
+
+### Configure
+
+In this section we summarise how to configure the CreatorCredentials app.
+
+### Deploy
+
+In this section we summarise how to deploy the CreatorCredentials app.
+
+## Profile
+
+Creator Credentials Verifiable Credentials profile follows the [EBSI](https://ebsi.eu) specifications. Details of the profile are defined [here](specs/profile.md).
+
+## Technical Specifications (wip)
+
+- [CC platform setup and configuration](specs/setup-config.md)
+- [Issuer authentication](specs/host-issuer-authenticaiton.md)
+- [DID web for Issuer Portal](specs/did.md)
+- [Creator email Verification](specs/creator-email-verification.md)
+
+Data models and schemas
+
+- [JSON Schema and examples of Verification VCs](json-schema/verification-credentials/)
+
+Advanced topics
+
+- [Creator logs in using its Creator Credentials](specs/advanced/log-in-with-cc.md)
 
 ## Reference
 
