@@ -20,6 +20,8 @@ sequenceDiagram
   b ->> b: Store the private/public key
   b ->> b: Derive did:key from the public key
 
+  b ->> ch: Issue Verified email VC
+
 ```
 
 1. Visit ...
@@ -31,9 +33,30 @@ sequenceDiagram
 7. For key generation and management see LINK to the specs
 8. How to store the keys see...
 9. Derive did:key as specified in LINK to did:key
+10. Issue Verified email
 
 DID key contains serialised and encoded public key. DID document it trivially derived from the DID key.
 
 - See how to define and encode/decode the public key <https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person> (before implementing it, check the code below)
 - Test how resolve public keys from did:key: <https://hub.ebsi.eu/tools/did-resolver>
   - See also the source code tab
+
+## Login to Liccium with CC VC
+
+Do not publish - internal notes
+
+```mermaid
+sequenceDiagram
+  actor c as Creator
+  participant cc as CreatorCredentials.cc
+  participant l as liccium.com
+
+  autonumber
+
+  c ->> l: Click login with VC
+  l ->> cc: Redirect to CC with Email VC request
+  c ->> cc: Log in
+  c ->> cc: Authorise VC sharing
+  cc ->> l: Redirect with code/state
+  l ->> cc: Fetch the email VC
+```

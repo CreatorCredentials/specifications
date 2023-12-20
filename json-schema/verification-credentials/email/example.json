@@ -12,7 +12,7 @@
   "validFrom": "2023-01-01T00:00:00Z",
   "validUntil": "2025-01-01T00:00:00Z",
   "credentialSubject": {
-    "id": "did:key:#0", // DID of the creator
+    "id": "did:key:alice...#0",
     "email": "alice@wonderland.com"
   },
   "credentialSchema": [
@@ -20,5 +20,8 @@
       "id": "https://github.com/creatorcredentials/schemas/email.json",
       "type": "JsonSchema"
     }
-  ]
+  ],
+  "termsOfUse": {
+    "visibility": "private"
+  }
 }
