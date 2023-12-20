@@ -1,9 +1,21 @@
 # Decentralised identifiers
 
-We're using the following identifiers
+## did:web for the Issuer Portal
 
-- Handler - human readable identifier that exists within the app
-- Decentralised Identifier (DIDs) - Globally unique and persistent identifier
+The IP MUST support did:web.
+
+- Generate a DID Document with public keys of the IP
+- [DID Document example](./examples/issuer-portal-did.json) of an IP
+  - DID Document MUST contain at least one public key: in this version we'll have only 1 public key
+  - DID Document MAY contain authentication
+  - DID Document MUST contain assertionMethod
+    - MUST reference the key that's used to sign VCs (email/wallet/domain verification)
+- DID Document MUST be stored in did.json file under: creatorcredentials.dev/.well-known/did.json
+  - Response header: content-type: application/did+ld+json
+
+## did:web for Issuers
+
+- WIP
 
 ## Legal entity decentralised identifiers
 
@@ -17,9 +29,7 @@ DID can be self-hosted or hosted by the platform. We're using the following conv
 - did:web:creatorcredentials.cc:{domain.name.issuer} - specific to {creatorcredentials.cc}
 - did:web:{domain.name.host}:{domain.name.issuer} - generic schema
 
-If DID is hosted, it is recommended to include the alsoKnownAs property in the
-DID document that is referencing the website of the entity. If entity is owner
-of multiple domains, all of them can be listed under the alsoKnownAs.
+If DID is hosted, it is recommended to include the alsoKnownAs property in the DID document that is referencing the website of the entity. If entity is owner of multiple domains, all of them can be listed under the alsoKnownAs.
 
 To create a reciprocal relationship, at least TXT DNS record should be set:
 
