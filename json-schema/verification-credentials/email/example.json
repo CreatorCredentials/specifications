@@ -22,6 +22,8 @@
     }
   ],
   "termsOfUse": {
-    "visibility": "private"
+    "type": "PresentationPolicy",
+    "confidentialityLevel": "restricted",
+    "pii": "sensitive"
   }
 }
