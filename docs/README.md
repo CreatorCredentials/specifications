@@ -2,6 +2,8 @@
 
 This folder contains core CC specifications.
 
+Titles marked with (wip) are subject to change.
+
 ## Table of contents
 
 - [CC platform setup and configuration](setup-config.md)

@@ -13,11 +13,7 @@ The IP MUST support did:web.
 - DID Document MUST be stored in did.json file under: creatorcredentials.dev/.well-known/did.json
   - Response header: content-type: application/did+ld+json
 
-## did:web for Issuers
-
-- WIP
-
-## Legal entity decentralised identifiers
+## did:web for Issuers (wip)
 
 Legal entities MUST set up their Decentralised Identifier (DID). Supported DID:
 
