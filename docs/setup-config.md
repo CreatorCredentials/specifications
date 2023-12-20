@@ -42,5 +42,3 @@ Key can be stored
 Suggestion: begin with plaintext local file with limited access rights or .env/ENV
 
 Example using OpenSSL: see the `../examples/gen-unencrypted.sh`
-
-#### did:web
