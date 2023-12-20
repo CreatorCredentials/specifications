@@ -8,11 +8,11 @@
     "VerifiableAttestation",
     "VerifiableEmail"
   ],
-  "issuer": "did:web:creatorcredentials.dev",
+  "issuer": "did:web:host.com",
   "validFrom": "2023-01-01T00:00:00Z",
   "validUntil": "2025-01-01T00:00:00Z",
   "credentialSubject": {
-    "id": "did:web:wonderland.com#0",
+    "id": "did:key:#0", // DID of the creator
     "email": "alice@wonderland.com"
   },
   "credentialSchema": [

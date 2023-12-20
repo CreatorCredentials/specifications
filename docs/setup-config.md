@@ -1,44 +1,84 @@
 # Setup and configuration
 
-The CC application consists of two main components
+- [Setup and configuration](#setup-and-configuration)
+  - [Host](#host)
+  - [Initialisation](#initialisation)
+  - [Host private-public key generation and storage](#host-private-public-key-generation-and-storage)
+  - [Instructions for hosts](#instructions-for-hosts)
+    - [How to configure](#how-to-configure)
+    - [How to deploy](#how-to-deploy)
 
-- issuer portal
-- creator hub
+In CC we have three roles
 
-## Issuer portal (IP)
+- Host - entity that hosts the application
+  - Signs/issues Verification VCs to Issuers and Creators
+  - Owns host.com (for creatorcredential.dev replace host.com with creatorcredentials.dev)
+  - Has did:web hosted at: host.com/.well-known/did.json
+    - did:web contains information about all host public keys: can be simple JWK key, or a Q-Cert
 
-Issuer portal must be support the following capabilities
+- Issuer - entity that uses the Issuer Portal
+  - Requests/Receives VCs from the Host
+  - Owns issuer.com
+  - Signs/Issues VCs to Creators
+  - Has did:web hosted at: issuer.com/.well-known/did.json
+    - did:web contains information about all host public keys: can be simple JWK key, or a Q-Cert
 
-- [User authentication](./issuer-portal-user-authentication.md) with organisational email
-- User verification
-  - Email
-  - Domain name
-  - Wallet
-- Credential issuance
+    - DNS TXT record/Domain Verification is NOT required
 
-### Initialisation
+- Creator - entity that uses the Creator Hub
+  - Requests/Receives VCs from the Host
+  - Requests/Receives VCs from Issuers
+  - Has did:key (did:ethr/...)
 
-The IP MUST have
+## Host
 
-- private-public key pair to issue VCs
-- did:web
+Host must be support the following capabilities
 
-Before deploying the solution, the user must configure
+- [Issuer Authentication](./host-issuer-authenticaiton.md) with organisational email
+- Perform Issuer verification
+  - did:web
+- Issue Verification VC to issuers
 
-- hostname
+## Initialisation
 
-#### Key generation and storage
+The Host MUST
 
-The solution must generate an EC secp256r1 (alternative names: P-256, prime256v1) key pair. Any library supporting ES256 signature should be generate such key pair. The key pair must be accessible to the IP component for the purpose of issuing VCs.
+- have private-public key pair to sign and issue Verification VCs
 
-Key can be stored
+Host did:web is set up automatically with the service.
+
+Before deploying the solution, the host must configure
+
+- hostname (host.com)
+- key storage location
+- database location
+- other (to be updated)
+
+TODO: define how to configure the solution
+
+## Host private-public key generation and storage
+
+The host application must generate an EC secp256r1 (alternative names: P-256, prime256v1) key pair. Any [library](https://jwt.io/libraries) supporting ES256 signature should be capable of generating such a key pair. The key pair must be accessible to the host application for the purpose of issuing Verification VCs.
+
+The private key can be stored
 
 - plaintext local file with limited access rights
+- ENV variable
+- secure keystore (AWS/Google/Azure/...)
+
 - encrypted local file with limited access rights
   - not recommended at this stage of the project as restarting the service requires manual intervention
-- ENV variable
-- keystore (google/azure/...)
 
 Suggestion: begin with plaintext local file with limited access rights or .env/ENV
 
-Example using OpenSSL: see the `../examples/gen-unencrypted.sh`
+Example using OpenSSL: see the [examples/gen-unencrypted.sh](./examples/gen-unencrypted.sh)
+
+## Instructions for hosts
+
+### How to configure
+
+TBD
+
+### How to deploy
+
+TBD
