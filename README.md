@@ -39,13 +39,14 @@ Creator Credentials Verifiable Credentials profile follows the [EBSI](https://eb
 
 ### Host
 
-- [CC platform setup and configuration](specs/setup-config.md)
-- [How host authenticates the issuer?](specs/host-issuer-authenticaiton.md)
-- [Host DID web profile](specs/host-did.md)
+- [How to set up and configure the CC app?](specs/host-setup-config.md)
+- [How to authenticates issuers?](specs/host-issuer-authenticaiton.md)
+- [How to configure host's did:web?](specs/host-did.md)
 
 ### Issuer
 
-- [Issuer DID web profile](specs/issuer-did.md)
+- [How to configure and verify issuer's did:web?](specs/issuer-did.md)
+- []()
 
 ### Creator
 
