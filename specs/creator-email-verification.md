@@ -1,7 +1,16 @@
-# Creator email verification
+# Creator email verification <!-- omit in toc -->
+
+- [Email verification process](#email-verification-process)
+- [Keypair generation](#keypair-generation)
+- [Private key security policies](#private-key-security-policies)
+- [Key storage](#key-storage)
+- [did:key](#didkey)
+- [Verifiable Credentials](#verifiable-credentials)
+- [Digital Signatures](#digital-signatures)
+
+## Email verification process
 
 This document describes the creator email verification.
-
 
 ```mermaid
 sequenceDiagram

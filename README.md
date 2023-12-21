@@ -1,4 +1,18 @@
-# CreatorCredentials
+# CreatorCredentials <!-- omit in toc -->
+
+- [Get started (wip)](#get-started-wip)
+  - [Build](#build)
+  - [Configure](#configure)
+  - [Deploy](#deploy)
+- [Profile](#profile)
+- [Technical Specifications (wip)](#technical-specifications-wip)
+  - [Host](#host)
+  - [Issuer](#issuer)
+  - [Creator](#creator)
+  - [Data models and schemas](#data-models-and-schemas)
+  - [Advanced topics](#advanced-topics)
+- [Reference](#reference)
+
 
 CreatorCredentials is an application for media organisations to issue Verifiable
 Credentials to creators.
@@ -23,16 +37,25 @@ Creator Credentials Verifiable Credentials profile follows the [EBSI](https://eb
 
 ## Technical Specifications (wip)
 
+### Host
+
 - [CC platform setup and configuration](specs/setup-config.md)
-- [Issuer authentication](specs/host-issuer-authenticaiton.md)
-- [DID web for Issuer Portal](specs/did.md)
+- [How host authenticates the issuer?](specs/host-issuer-authenticaiton.md)
+- [Host DID web profile](specs/host-did.md)
+
+### Issuer
+
+- [Issuer DID web profile](specs/issuer-did.md)
+
+### Creator
+
 - [Creator email Verification](specs/creator-email-verification.md)
 
-Data models and schemas
+### Data models and schemas
 
 - [JSON Schema and examples of Verification VCs](json-schema/verification-credentials/)
 
-Advanced topics
+### Advanced topics
 
 - [Creator logs in using its Creator Credentials](specs/advanced/log-in-with-cc.md)
 

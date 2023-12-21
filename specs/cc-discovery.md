@@ -1,4 +1,11 @@
-# CC issuers and hosts discovery
+# CC issuers and hosts discovery <!-- omit in toc -->
+
+- [CC host capabilities](#cc-host-capabilities)
+- [CC discovery service](#cc-discovery-service)
+  - [Data model](#data-model)
+  - [Resolution](#resolution)
+  - [Registration protocol](#registration-protocol)
+- [Protocol details](#protocol-details)
 
 Creator Credentials is a multi-tenant VC issuance service. We're introducing the following roles
 

@@ -1,10 +1,9 @@
-# Creator Credentials Verifiable Credentials profile
+# Creator Credentials Verifiable Credentials profile <!-- omit in toc -->
 
-- [Creator Credentials Verifiable Credentials profile](#creator-credentials-verifiable-credentials-profile)
-  - [DID Method](#did-method)
-  - [Verifiable Credentials data model](#verifiable-credentials-data-model)
-  - [Signature profile](#signature-profile)
-  - [Verifiable Credentials Exchange profile](#verifiable-credentials-exchange-profile)
+- [DID Method](#did-method)
+- [Verifiable Credentials data model](#verifiable-credentials-data-model)
+- [Signature profile](#signature-profile)
+- [Verifiable Credentials Exchange profile](#verifiable-credentials-exchange-profile)
 
 ## DID Method
 

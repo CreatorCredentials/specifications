@@ -1,4 +1,9 @@
-# Creator uses its Creator Credentials to log in
+# Creator uses its Creator Credentials to log in <!-- omit in toc -->
+
+- [Creator authenticates using its Creator VCs](#creator-authenticates-using-its-creator-vcs)
+- [Verifiable Presentations profile](#verifiable-presentations-profile)
+
+## Creator authenticates using its Creator VCs
 
 Creators can use their Verifiable Credentials to log in into another platform that supports authentication with Verifiable Credentials. The sequence diagram summarises such flow.
 
@@ -33,6 +38,6 @@ sequenceDiagram
 
 Creator Credentials platform enables creators to authenticate with their email or other Verifiable Credentials. We are following the [EBSI profile](https://hub.ebsi.eu/conformance/build-solutions/holder-wallet-functional-flows) for Verifiable Credentials exchange.
 
-## Verifiable Presentations
+## Verifiable Presentations profile
 
 Verifiable Presentation data model is defined int the [W3C VC specifications](https://w3c.github.io/vc-data-model/#presentations-0). Verifiable Presentations are signed the same way as described in the [email VC issuance specifications](../creator-email-verification.md).
