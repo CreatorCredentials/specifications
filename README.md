@@ -46,7 +46,6 @@ Creator Credentials Verifiable Credentials profile follows the [EBSI](https://eb
 ### Issuer
 
 - [How to configure and verify issuer's did:web?](specs/issuer-did.md)
-- []()
 
 ### Creator
 
