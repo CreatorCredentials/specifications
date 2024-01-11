@@ -1,11 +1,15 @@
 # CreatorCredentials <!-- omit in toc -->
 
-- [Getting started (wip)](#getting-started-wip)
+Creator Credentials software application that can be used by media organisations, membership organisations or other trust services to issue verifiable credentials to creators and other rightsholders.
+
+## Table of Content
+
+- [Getting started (work in progress)](#getting-started-wip)
   - [Build](#build)
   - [Configure](#configure)
   - [Deploy](#deploy)
 - [Profile](#profile)
-- [Technical Specifications (wip)](#technical-specifications-wip)
+- [Technical Specifications (work in progress)](#technical-specifications-wip)
   - [Host](#host)
   - [Issuer](#issuer)
   - [Creator](#creator)
@@ -13,29 +17,25 @@
   - [Advanced topics](#advanced-topics)
 - [Reference](#reference)
 
-
-CreatorCredentials is an application for media organisations to issue Verifiable
-Credentials to creators.
-
-## Getting started (wip)
+## Getting started (work in progress)
 
 ### Build
 
-In this section, we summarise how to build the CreatorCredentials app.
+_In this section, we summarise how to build the CreatorCredentials app._
 
 ### Configure
 
-In this section, we summarise how to configure the CreatorCredentials app.
+_In this section, we summarise how to configure the CreatorCredentials app._ 
 
 ### Deploy
 
-In this section, we summarise how to deploy the CreatorCredentials app.
+_In this section, we summarise how to deploy the CreatorCredentials app._
 
 ## Profile
 
 The Creator Credentials (CC) Verifiable Credentials (VC) profile follows the [EBSI](https://ebsi.eu) specifications. Details of the profile are defined [here](specs/profile.md).
 
-## Technical Specifications (wip)
+## Technical Specifications (work in progress)
 
 ### Host
 
