@@ -39,7 +39,7 @@ The Creator Credentials (CC) Verifiable Credentials (VC) profile follows the [EB
 
 ### Host
 
-- How to set up and configure the CC app?: [specs/host-setup-config.md](specs/host-setup-config.md)
+- How to set up and configure the CC app?: <specs/host-setup-config.md>(specs/host-setup-config.md)
 - How to configure host's DID (did:web)?: [specs/host-did.md](specs/host-did.md)
 - How to authenticate the issuers?: [specs/host-issuer-authentication.md](specs/host-issuer-authentication.md)
 
