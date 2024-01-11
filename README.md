@@ -4,12 +4,12 @@ Creator Credentials software application that can be used by media organisations
 
 ## Table of Content
 
-- [Getting started (work in progress)](#getting-started-wip)
+- [Getting started (work in progress)](#getting-started-work-in-progress)
   - [Build](#build)
   - [Configure](#configure)
   - [Deploy](#deploy)
 - [Profile](#profile)
-- [Technical Specifications (work in progress)](#technical-specifications-wip)
+- [Technical Specifications (work in progress)](#technical-specifications-work-in-progress)
   - [Host](#host)
   - [Issuer](#issuer)
   - [Creator](#creator)
