@@ -6,48 +6,55 @@
   - [Initialisation](#initialisation)
   - [Host private-public key generation and storage](#host-private-public-key-generation-and-storage)
 
-## Overview
+## Roles
 
-In CC we identify three roles: host, issuer and creator.
+For the Creator Credentials application (CC app) we identify three roles: 
 
-- Host - entity that hosts the application
+1) Host,
+2) Issuer
+3) Creator
+
+Re/ 1) The **Host** is the entity that hosts the application:  
+
   - Signs/issues Verification VCs to Issuers and Creators
   - Owns host.com (for creatorcredential.dev replace host.com with creatorcredentials.dev)
   - Has did:web hosted at: host.com/.well-known/did.json
-    - did:web contains information about all host public keys: can be simple JWK key, or a Q-Cert
+    - The did:web document contains information about all of the Host's public keys: which can be a simple JWK key pair, or a Q-Cert
 
-- Issuer - entity that uses the Issuer Portal
-  - Requests/Receives VCs from the Host
-  - Owns issuer.com
+Re/ 2) The **Issuer** is the entity that uses the Issuer Portal:  
+
+  - Requests/receives VCs from the Host
+  - Controls the web domain: issuer.com
   - Signs/Issues VCs to Creators
-  - Has did:web hosted at: issuer.com/.well-known/did.json
-    - did:web contains information about all host public keys: can be simple JWK key, or a Q-Cert
+  - Has the did:web document hosted at: issuer.com/.well-known/did.json
+    - The did:web document contains information about all of the Host public keys: which can be a simple JWK key pair, or a Q-Cert
 
-    - DNS TXT record/Domain Verification is NOT required
+    - A DNS TXT record/Domain Verification is NOT required
 
-- Creator - entity that uses the Creator Hub
+Re/ 3) The **Creator** is the entity that uses the Creator Hub:  
+
   - Requests/Receives VCs from the Host
   - Requests/Receives VCs from Issuers
-  - Has did:key (did:ethr/...)
+  - Has a did:key (did:ethr/...)
 
 ## Host
 
-Host must be support the following capabilities
+The Host must be support the following capabilities:
 
 - [Issuer Authentication](./host-issuer-authenticaiton.md) with organisational email
-- Perform Issuer verification
+- Perform Issuer Verification
   - did:web
-- Issue Verification VC to issuers
+- Issue Verification VC to Issuers
 
-## Initialisation
+### Initialisation
 
-The Host MUST
+The Host MUST:
 
 - have private-public key pair to sign and issue Verification VCs
 
 Host did:web is set up automatically with the service.
 
-Before deploying the solution, the host must configure
+Before deploying the solution, the host must configure:
 
 - hostname (host.com)
 - key storage location
