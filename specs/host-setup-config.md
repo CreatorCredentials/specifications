@@ -61,7 +61,7 @@ Before deploying the solution, the host must configure:
 - database location
 - other (to be updated)
 
-## Host private-public key generation and storage
+### Host private-public key generation and storage
 
 The host application must generate an EC secp256r1 (alternative names: P-256, prime256v1) key pair. Any [library](https://jwt.io/libraries) supporting ES256 signature should be capable of generating such a key pair. The key pair must be accessible to the host application for the purpose of issuing Verification VCs.
 
