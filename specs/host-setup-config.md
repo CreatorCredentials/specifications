@@ -41,7 +41,7 @@ Re/ 3) The **Creator** is the entity that uses the Creator Hub:
 
 The Host must be support the following capabilities:
 
-- [Issuer Authentication](./host-issuer-authenticaiton.md) with organisational email
+- [Issuer Authentication](./host-issuer-authentication.md) with organisational email
 - Perform Issuer Verification
   - did:web
 - Issue Verification VC to Issuers
