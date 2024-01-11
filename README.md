@@ -45,22 +45,23 @@ The Creator Credentials (CC) Verifiable Credentials (VC) profile follows the [EB
 
 ### Issuer
 
-- [How to configure and verify issuer's did:web?](specs/issuer-did.md)
+- How to configure and verify issuer's did:web? [specs/issuer-did.md](specs/issuer-did.md)
 
 ### Creator
 
-- [Creator email Verification](specs/creator-email-verification.md)
+- Creator email Verification: [specs/creator-email-verification.md](specs/creator-email-verification.md)
 
 ### Data models and schemas
 
-- [JSON Schema and examples of Verification VCs](json-schema/verification-credentials/)
+- JSON Schema and examples of Verification VCs: [json-schema/verification-credentials/](json-schema/verification-credentials/)
 
 ### Advanced topics
 
-- [Creator logs in using its Creator Credentials](specs/advanced/log-in-with-cc.md)
+- Creator logs in using its Creator Credentials: [specs/advanced/log-in-with-cc.md](specs/advanced/log-in-with-cc.md)
 
 ## Reference
 
-- <https://w3c-ccg.github.io/did-method-web/#example-creating-the-did-with-optional-path>
-- <https://aws.amazon.com/kms/>
-- <https://jwt.io/>
+- Creating a did:web (did:web Method Specification): https://w3c-ccg.github.io/did-method-web/#create-register
+<!-- This was mentioned - <https://w3c-ccg.github.io/did-method-web/#example-creating-the-did-with-optional-path> -->
+- AWS Key Management Service: <https://aws.amazon.com/kms/>
+- JSON Web Tokens: <https://jwt.io/>
