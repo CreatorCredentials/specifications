@@ -1,68 +1,54 @@
-# CreatorCredentials <!-- omit in toc -->
+# CreatorCredentials – specifications
 
-Creator Credentials software application that can be used by media organisations, membership organisations or other trust services to issue verifiable credentials to creators and other rightsholders.
+> A technical reference reconstructed from the
+> `creator-credentials-backend` and `creator-credentials-ui` code as of
+> 2026-08-21. It supersedes the earlier design specs, which described a
+> system that was largely not built (OIDC IdP, a three-role "Host" model,
+> did:web-everywhere, Bitstring-Status-List revocation, discovery, and
+> log-in-with-CC). The revocation, discovery, and log-in-with-CC designs are
+> preserved under [`future/`](future/).
 
-## Table of Content
+Creator Credentials is a software application that media organisations,
+membership organisations, and other trust services use to issue Verifiable
+Credentials to creators and other rightsholders. It is a **Clerk**-authenticated
+two-role app (**Issuer** and **Creator**); the platform (Liccium) self-signs a
+set of Verification Credentials and issuers sign membership / data-supplier
+credentials with their own eIDAS certificate.
 
-- [Table of Content](#table-of-content)
-- [Getting started](#getting-started)
-  - [Build](#build)
-  - [Configure](#configure)
-  - [Deploy](#deploy)
-- [Profile](#profile)
-- [Technical Specifications](#technical-specifications)
-  - [Host](#host)
-  - [Issuer](#issuer)
-  - [Creator](#creator)
-  - [Data models and schemas](#data-models-and-schemas)
-  - [Advanced topics](#advanced-topics)
-- [Reference](#reference)
+## Technical reference
 
-## Getting started
+Read in order; each doc is cited to `path:line` in the code.
 
-### Build
+1. [Architecture overview](specs/01-architecture-overview.md) – services, ports, data flow.
+2. [Roles & actors](specs/02-roles-and-actors.md) – platform vs Issuer vs Creator (there is no "Host" role).
+3. [Verifiable Credential catalog](specs/03-verifiable-credentials-catalog.md) – every VC type the backend issues.
+4. [Connections & issuance](specs/04-connections-and-issuance.md) – the creator↔issuer connection lifecycle and the request → accept → cert-signed verify state machine.
+5. [Authentication & provisioning](specs/05-auth-and-provisioning.md) – Clerk, the svix webhook, and the terms gate.
+6. [Signing & trust model](specs/06-signing-and-trust-model.md) – the three signing paths and the eIDAS LOTL trust store.
+7. [Verification flows](specs/07-verification-flows.md) – email / domain / did:web / external-keypair / issuer eIDAS cert.
+8. [API reference](specs/08-api-reference.md) – the real `/v1` HTTP surface.
+9. [Data model](specs/09-data-model.md) – entities, enums, and the migration-derived schema.
+10. [Profile](specs/10-profile.md) – the normative DID-method and data-model profile.
 
-_In this section, we summarise how to build the CreatorCredentials app._
+## Data models and schemas
 
-### Configure
+JSON Schemas + examples for the issued Verifiable Credentials:
+[`json-schema/verification-credentials/`](json-schema/verification-credentials/).
+See the [schema index](json-schema/README.md) for the canonical schema URL of
+each VC type. **Note for developers:** the backend currently emits several
+`credentialSchema.id` URLs that do not resolve – tracked in the schema index.
 
-_In this section, we summarise how to configure the CreatorCredentials app._ 
+## Planned / not yet implemented
 
-### Deploy
+Parked designs, kept under [`future/`](future/):
 
-_In this section, we summarise how to deploy the CreatorCredentials app._
-
-## Profile
-
-The Creator Credentials (CC) Verifiable Credentials (VC) profile follows the [EBSI](https://ebsi.eu) specifications. Details of the profile are defined [here](specs/profile.md).
-
-## Technical Specifications
-
-### Host
-
-- How to set up and configure the CC app: [specs/host-setup-config.md](specs/host-setup-config.md)
-- How to configure host's DID (did:web): [specs/host-did.md](specs/host-did.md)
-- How to authenticate the issuers: [specs/host-issuer-authentication.md](specs/host-issuer-authentication.md)
-
-### Issuer
-
-- How to configure and verify issuer's did:web [specs/issuer-did.md](specs/issuer-did.md)
-
-### Creator
-
-- Creator email Verification: [specs/creator-email-verification.md](specs/creator-email-verification.md)
-
-### Data models and schemas
-
-- JSON Schema and examples of Verification VCs: [json-schema/verification-credentials/](json-schema/verification-credentials/)
-
-### Advanced topics
-
-- Creator logs in using its Creator Credentials: [specs/advanced/log-in-with-cc.md](specs/advanced/log-in-with-cc.md)
+- [Bitstring-Status-List revocation](future/revocation-bitstring-status-list.md) and [issuer VC revocation](future/issuer-vc-revocation.md)
+- [Host/issuer discovery](future/cc-discovery.md) (+ [`future/discovery-json-schema/`](future/discovery-json-schema/))
+- [Log in with Creator Credentials](future/log-in-with-cc.md)
 
 ## Reference
 
-- Creating a did:web (did:web Method Specification): https://w3c-ccg.github.io/did-method-web/#create-register
-<!-- This was mentioned - <https://w3c-ccg.github.io/did-method-web/#example-creating-the-did-with-optional-path> -->
-- AWS Key Management Service: <https://aws.amazon.com/kms/>
-- JSON Web Tokens: <https://jwt.io/>
+- did:web Method Specification: https://w3c-ccg.github.io/did-method-web/
+- W3C Verifiable Credentials Data Model v2: https://www.w3.org/TR/vc-data-model-2.0/
+- did:key Method: https://w3c-ccg.github.io/did-method-key/
+- JSON Web Tokens: https://jwt.io/
