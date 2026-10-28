@@ -534,9 +534,11 @@ Test hooks: the UI exposes stable `data-testid` attributes for the suite:
 
 ## Implementation status
 
-Implemented 2026-10-28 in the working trees of `creator-credentials-backend`
-(branch `develop`) and `creator-credentials-ui` (branch `main`); nothing is
-committed or deployed yet. Verification: backend 68 unit tests green (5
+Committed 2026-10-28 to `creator-credentials-backend` `develop` (1a444b9, 2145aff,
+9c405b8) and `creator-credentials-ui` `main` (5667c3c). Backend deployed to the
+dev environment (`cc-backend.liccium.network`, image `creator-credentials-dev:20261028-9c405b8`)
+with the three migrations applied; the UI is not yet deployed (the Vercel
+project is outside the maintainer's access). Production untouched. Verification: backend 68 unit tests green (5
 pre-existing scaffold suites still fail as before), `tsc` at baseline;
 migrations applied, reverted and re-applied on a fresh PostgreSQL 15 and the
 `CREATOR` unique index proven; UI 48 unit tests, lint, `tsc` and `next build`
@@ -567,3 +569,7 @@ Decisions taken during implementation, to confirm at review:
   ids stay strings.
 - `GET /credentials/issuers` items without a `creator` (legacy rows) render a
   placeholder in the UI instead of being dropped.
+- Found during the dev rollout: the runtime DataSource had `migrationsRun: true`
+  but no `migrations` list, so boot never applied migrations (the README's
+  claim was wrong); fixed in 9c405b8. The images' `pnpm approve-builds` step
+  broke `pnpm install` with current pnpm; removed, pnpm pinned (2145aff).
