@@ -85,6 +85,8 @@ The pending row stashes transient JSON on `credential_object`: `__keypairSnapsho
 
 **Teardown:** `POST /v1/credentials/:id/reject` or `DELETE /v1/credentials/:id` (issuer-only) deletes the pending/issued row (`removeMemberCredential`, `src/credentials/credentials.controller.ts:521-544`).
 
+> **Planned change (decided 2026-10-28):** `SUCCESS` rows will move to `REVOKED` via `POST /v1/credentials/:id/revoke` (ownership-checked) instead of being deleted; `reject` keeps removing `PENDING` rows and gains the same ownership guard; `DELETE` is deprecated. See [`11-planned-changes.md` §CR-1](./11-planned-changes.md#cr-1-revocation-of-issuer-issued-credentials).
+
 ### State diagram
 
 | Credential status | Trigger | Next |
@@ -94,6 +96,8 @@ The pending row stashes transient JSON on `credential_object`: `__keypairSnapsho
 | `PENDING` | `POST /credentials/:id/accept/verify-signature` (valid sig) | `SUCCESS` |
 | `PENDING` | invalid signature | remains `PENDING` (409 `ConflictException`) |
 | `PENDING` / `SUCCESS` | `POST /credentials/:id/reject` or `DELETE /credentials/:id` | row deleted |
+
+*Planned (CR-1):* `SUCCESS` → `POST /credentials/:id/revoke` → `REVOKED` (row kept); `PENDING` → `reject` → row deleted.
 
 ### Handshake sequence
 

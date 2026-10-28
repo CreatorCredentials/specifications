@@ -1,0 +1,29 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/credentials/v2"
+  ],
+  "id": "urn:uuid:3f1c2a8e-6b0d-4c7a-9f42-1d9e8b7a6c55",
+  "type": [
+    "VerifiableCredential",
+    "VerifiableAttestation",
+    "VerifiableCreator"
+  ],
+  "issuer": "did:web:liccium.com",
+  "validFrom": "2026-11-01T00:00:00Z",
+  "validUntil": "2029-11-01T00:00:00Z",
+  "credentialSubject": {
+    "id": "did:key:zDnaey3e1ief3tTdayKafvN7ax6XkU6utX9VEBcVTZNKmBz94",
+    "verifiedBy": "liccium.com"
+  },
+  "credentialSchema": [
+    {
+      "id": "https://raw.githubusercontent.com/CreatorCredentials/specifications/main/json-schema/verification-credentials/creator/schema.json",
+      "type": "JsonSchema"
+    }
+  ],
+  "termsOfUse": {
+    "type": "PresentationPolicy",
+    "confidentialityLevel": "public",
+    "pii": "none"
+  }
+}

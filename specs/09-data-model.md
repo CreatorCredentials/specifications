@@ -158,6 +158,8 @@ Canonical definitions live in `src/shared/typings/`.
 **`CredentialVerificationStatus`** (`CredentialVerificationStatus.ts`):
 `PENDING`, `SUCCESS`, `FAILED`. (Stored on `credential.credential_status`.)
 
+> *Planned (CR-1, decided 2026-10-28):* `REVOKED` is added to the enum, and `credential` gains `revoked_at timestamptz NULL` and `revoked_reason varchar(500) NULL`. See [`11-planned-changes.md`](11-planned-changes.md#cr-1-revocation-of-issuer-issued-credentials).
+
 **`CredentialTemplateType`** (`CredentialTemplateType.ts`):
 `MEMBER`, `STUDENT`, `EXTERNAL_KEYPAIR`, `LICCIUM_EXTERNAL_KEYPAIR`. (Stored on `template.template_type`.)
 

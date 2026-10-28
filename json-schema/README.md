@@ -23,6 +23,7 @@ https://raw.githubusercontent.com/CreatorCredentials/specifications/main/json-sc
 | Member (`MEMBER`) | `VerifiableMembership` | `member-cert-signed` | `…/verification-credentials/member-cert-signed/schema.json` |
 | Data Supplier (`DATASUPPLIER`) + Liccium Data Supplier (`LICCIUM_DATASUPPLIER`) | `VerifiableDataSupplier` | `data-supplier-cert-signed` | `…/verification-credentials/data-supplier-cert-signed/schema.json` |
 | External Keypair Verification (`EXTERNAL_KEYPAIR_VERIFICATION`) | `ExternalKeypairVerification` | `external-keypair` | `…/verification-credentials/external-keypair/schema.json` |
+| Verifiable Creator (`CREATOR`, planned – CR-4) | `VerifiableCreator` | `creator` | `…/verification-credentials/creator/schema.json` |
 
 (Full base prefix on every row:
 `https://raw.githubusercontent.com/CreatorCredentials/specifications/main/json-schema/verification-credentials/…`)
@@ -47,6 +48,7 @@ Notes on the markers:
 | `member-cert-signed` | `id` (did), `memberOf` (string/did) |
 | `data-supplier-cert-signed` | `id` (did), `dataSupplierFor` (string), `sameAs` (string, optional) |
 | `external-keypair` | `email` (string), `sameAs` (did), `organizationName` (string, optional) |
+| `creator` | `id` (did), `verifiedBy` (hostname of the verifying party, `liccium.com` for the platform-issued credential) |
 
 ## Developer note – the backend currently emits `credentialSchema.id`s that 404
 

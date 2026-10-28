@@ -206,6 +206,8 @@ There are exactly three signing paths. Which one a VC uses is fixed per type (se
 
 ## Revocation
 
+> **Planned change (decided 2026-10-28):** issued credentials will be revoked by setting `credential_status = REVOKED` (with `revoked_at` / `revoked_reason`) instead of deleting the row; `DELETE /v1/credentials/:id` is deprecated in favour of `POST /v1/credentials/:id/revoke`. Design and acceptance criteria: [`11-planned-changes.md` §CR-1](./11-planned-changes.md#cr-1-revocation-of-issuer-issued-credentials). The text below describes the current code.
+
 **Current reality: there is no cryptographic revocation.** No status list, no revocation VC, no `credentialStatus` entry in the VC object. "Revocation" today means one of:
 
 - **Row deletion** – Email / Domain / did:web / Connect on disconnect or re-provision; Member / Data Supplier via `POST /v1/credentials/:id/reject` or `DELETE /v1/credentials/:id` (issuer-only, `credentials.controller.ts:521-544`).

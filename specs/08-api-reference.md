@@ -88,6 +88,8 @@ The VC issuance engine. Controller `CredentialsController` (`src/credentials/cre
 | `DELETE credentials/:credentialId` | Issuer | Delete a credential (`:534`). | – → `void` |
 | `POST credentials/export` | public (JWT) | Cross-app import (see below) (`:279`). | `{ token }` → `{ userId, userEmail, credentials }` |
 
+> **Planned change (decided 2026-10-28):** `POST credentials/:credentialId/revoke` `{ reason? }` (issuer, owner only) sets `REVOKED`; `reject` and the deprecated `DELETE` apply to owned `PENDING` rows only; `?status=revoked` is accepted by `GET credentials/issuers`. See [`11-planned-changes.md` §CR-1](11-planned-changes.md#cr-1-revocation-of-issuer-issued-credentials).
+
 The accept → verify-signature pair is a challenge/response state machine: `accept` computes a JWS `signingInput` (`x5c` header) and stashes it as `__acceptanceChallenge` on the pending row; `verify-signature` checks the issuer's external-cert signature (`crypto.createVerify('SHA256')`) and, on success, sets `SUCCESS`, writes `credentialObject` + `token`, and attaches `proof.jwt`. Full trace in [`04-connections-and-issuance.md`](04-connections-and-issuance.md).
 
 ### Cross-app import

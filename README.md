@@ -29,6 +29,7 @@ Read in order; each doc is cited to `path:line` in the code.
 8. [API reference](specs/08-api-reference.md) – the real `/v1` HTTP surface.
 9. [Data model](specs/09-data-model.md) – entities, enums, and the migration-derived schema.
 10. [Profile](specs/10-profile.md) – the normative DID-method and data-model profile.
+11. [Planned changes](specs/11-planned-changes.md) – change requests (October 2026): revocation by status instead of deletion (decided), issued-page search and creator identity, e-mail notifications, `VerifiableCreator`, security fixes.
 
 ## Data models and schemas
 
@@ -41,6 +42,8 @@ each VC type. **Note for developers:** the backend currently emits several
 ## Planned / not yet implemented
 
 Parked designs, kept under [`future/`](future/):
+
+Active change requests with status and open questions: [`specs/11-planned-changes.md`](specs/11-planned-changes.md).
 
 - [Bitstring-Status-List revocation](future/revocation-bitstring-status-list.md) and [issuer VC revocation](future/issuer-vc-revocation.md)
 - [Host/issuer discovery](future/cc-discovery.md) (+ [`future/discovery-json-schema/`](future/discovery-json-schema/))
