@@ -539,10 +539,10 @@ Committed 2026-10-28 to `creator-credentials-backend` `develop` (1a444b9, 2145af
 dev environment (`cc-backend.liccium.network`, image `creator-credentials-dev:20261028-9c405b8`)
 with the three migrations applied. The UI repo deploys to production from
 `main` on Vercel: build `b8d86b7` (Node 24, React 19, Clerk 7.9, TanStack
-Query 5) is live on creatorcredentials.app since 2026-10-28, while the
-production backend still runs the previous release. Until the backend ships,
-the production issued page shows placeholders for creator identity and the
-revoke action fails with an error toast; everything else is unchanged. Verification: backend 68 unit tests green (5
+Query 5) is live on creatorcredentials.app since 2026-10-28, and the production
+backend followed the same day (image `creator-credentials-prod:20261028-9c405b8`,
+migrations applied at boot). CR-1, CR-2, CR-4 and CR-5 are therefore live in
+production; CR-3 runs with the log transport until SES is configured. Verification: backend 68 unit tests green (5
 pre-existing scaffold suites still fail as before), `tsc` at baseline;
 migrations applied, reverted and re-applied on a fresh PostgreSQL 15 and the
 `CREATOR` unique index proven; UI 48 unit tests, lint, `tsc` and `next build`
