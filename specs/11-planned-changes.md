@@ -14,6 +14,8 @@ mark it *Shipped* here.
 | [CR-3](#cr-3-e-mail-notifications) | E-mail notifications (sign-ups, connection requests, VC requests) | **Decided** (assumed defaults) | 2026-10-28 |
 | [CR-4](#cr-4-verifiablecreator-credential) | `VerifiableCreator` credential | **Decided** (assumed defaults) | 2026-10-28 |
 | [CR-5](#cr-5-security-and-hygiene-fixes) | Security and hygiene fixes found during the audit | **Decided** | 2026-10-28 |
+| [CR-6](#cr-6-admin-role-and-admin-panel) | Admin role and admin panel (view, download, revoke; never sign) | **Decided** | 2026-10-29 |
+| [CR-7](#cr-7-revocation-list-and-credential-verification) | Revocation list (W3C Bitstring Status List) and `POST /credentials/verify` | **Decided** | 2026-10-29 |
 
 Source of CR-1–CR-4: client notes received 2026-10-28. Source of CR-5: code
 audit of `creator-credentials-backend` and `creator-credentials-ui` on the
@@ -445,6 +447,133 @@ deferred to the next dependency pass.
 8. **UI.** Duplicate React keys on the issued page, the missing
    `errors.fetching-creators` key and the search placeholder namespace,
    hard-coded English in `ConfirmationModal` moved to the `common` namespace.
+
+---
+
+## CR-6 Admin role and admin panel
+
+**Status: Decided 2026-10-29.** A third role, `admin`, operated by the
+platform. It can see everything, download any credential, and revoke issued
+credentials. It can never request, accept or sign a credential and it owns no
+issuer identity.
+
+### Role model
+
+- Clerk `publicMetadata.role = 'ADMIN'` (set by hand in the Clerk dashboard;
+  there is no admin sign-up). The webhook maps it to `ClerkRole.Admin = 'admin'`
+  (`user_clerk_role_enum` gains `admin`; migration `ADD VALUE IF NOT EXISTS`).
+  Provisioning stays as for other users (cert + did:key are minted but unused).
+- Backend guard `RolesGuard` + `@Roles(ClerkRole.Admin)` on every `/v1/admin/*`
+  route (the existing `AuthGuard` loads the user). All existing issuer and
+  creator routes keep their role checks, so an admin is rejected by
+  `request`, `accept`, `verify-signature`, `create/email` and the connection
+  endpoints by construction; a test asserts `403` for each.
+- Revocation by an admin is recorded: `credential.revoked_by_user_id`
+  (nullable FK → `user.id`) is set for every revoke (issuer or admin), so the
+  creator-side text can say who revoked.
+
+### API (`/v1/admin`, admin only)
+
+| Method + path | Purpose | Response |
+|---|---|---|
+| `GET admin/credentials?status=&type=&issuerId=&q=&page=&pageSize=` | every credential across issuers and creators; `q` matches creator/issuer name, e-mail and did:key; `pageSize` ≤ 100 | `{ items: AdminCredential[], total, page, pageSize }` |
+| `GET admin/credentials/:id` | one credential with the full object and proof (for download) | `AdminCredential` |
+| `POST admin/credentials/:id/revoke` `{ reason? }` | revoke any `SUCCESS` credential; same state rules as CR-1, no ownership rule | `AdminCredential` |
+| `GET admin/users?role=&q=&page=` | issuers and creators with identity and counts | paged list |
+| `GET admin/stats` | counts by role, by credential type and status, revocations in the last 30 days | object |
+
+`AdminCredential` = the CR-2 issued shape plus `issuer: { id, name, domain }`,
+`revokedBy: { id, name, role } | null`, `statusList: { credential, index } | null`
+(CR-7).
+
+Events: an admin revoke emits `credential.revoked` with `revokedByRole`;
+the creator **and** the issuer are notified.
+
+### UI (`/admin`, admin only)
+
+- `src/proxy.ts` protects `/admin(.*)`; the sidebar shows the admin
+  navigation for `publicMetadata.role === 'ADMIN'`; other roles get 404 on
+  `/admin`.
+- `/admin/credentials`: table with status chips (Issued | Pending | Revoked),
+  type and issuer filters, search, pagination; row actions: view (drawer with
+  the credential object, issuer, creator, status-list entry), download JSON,
+  revoke (modal with reason, confirm). No accept / sign controls exist.
+- `/admin/users`: issuers and creators with counts, link to their credentials.
+- `/admin/verify`: paste a JWT or credential JSON → calls
+  `POST /v1/credentials/verify` and shows the three checks (CR-7).
+- Test ids: `admin-credentials-table`, `admin-row`, `admin-filter-status-*`,
+  `admin-search`, `admin-view`, `admin-download`, `admin-revoke`,
+  `admin-revoke-reason`, `admin-revoke-confirm`, `admin-verify-input`,
+  `admin-verify-submit`, `admin-verify-result`.
+
+### Acceptance criteria
+
+1. A Clerk user with `role = ADMIN` sees `/admin/*`, lists credentials of
+   every issuer, downloads one, revokes one (creator and issuer notified,
+   `revoked_by_user_id` set).
+2. The same user gets `403`/`404` on every issuer and creator mutation
+   endpoint and sees none of their pages.
+3. Issuer and creator behaviour is unchanged (existing tests still pass).
+
+---
+
+## CR-7 Revocation list and credential verification
+
+**Status: Decided 2026-10-29.** Today revocation exists only as a database
+status (CR-1); a downloaded VC cannot be checked. This adds a W3C **Bitstring
+Status List v1.0** served by the platform and a public verification endpoint.
+
+### Status list
+
+- One list per environment, id `1`, 131 072 entries, `statusPurpose:
+  "revocation"` (profile from `future/revocation-bitstring-status-list.md`).
+- `credential.status_list_index integer UNIQUE NULL` is allocated from a
+  sequence when a credential becomes `SUCCESS` (self-issued at creation,
+  issuer-issued at `verify-signature`, `CREATOR` at creation). Credentials
+  issued before this change have no index and stay uncheckable; the admin
+  list shows them as "no status entry".
+- Every newly issued VC object carries
+  `credentialStatus: { id: "<APP_BASE_URL>/v1/status-lists/1#<index>", type: "BitstringStatusListEntry", statusPurpose: "revocation", statusListIndex: "<index>", statusListCredential: "<APP_BASE_URL>/v1/status-lists/1" }`
+  (added before signing, so it is covered by the proof).
+- `GET /v1/status-lists/1` (public, excluded from the Clerk gate) returns the
+  `BitstringStatusListCredential` (`@context` v2, `type: ["VerifiableCredential","BitstringStatusListCredential"]`,
+  `issuer: did:web:liccium.com`, `validFrom` now, `validUntil` +24 h,
+  `credentialSubject: { type: "BitstringStatusList", statusPurpose: "revocation", encodedList }`)
+  where `encodedList` is the multibase (`u` + base64url) GZIP of the bitstring
+  with a `1` at every index whose credential is `REVOKED`. It is signed with
+  signing path 1 and served as JSON with `proof.jwt` (and raw JWT with
+  `Accept: application/vc+jwt` or `?format=jwt`). The list is rebuilt from the
+  database at most every 60 s (in-memory cache); `revoke` invalidates it.
+- `Cache-Control: public, max-age=60`.
+
+### Verification endpoint
+
+`POST /v1/credentials/verify` (public, rate-limited by the proxy as `/export`
+is) with body `{ "jwt": "<compact JWS>" }` or `{ "credential": { …, "proof": { "jwt" } } }`:
+
+| Check | How | Result field |
+|---|---|---|
+| signature | the JWS `x5c` leaf certificate's public key verifies the compact JWS (`RS256` / `ES256`, raw and legacy DER ECDSA both accepted); the payload equals the credential object | `signature: { valid, issuerDid, certificateSubject }` |
+| validity | `validFrom <= now <= validUntil` | `validity: { valid, validFrom, validUntil }` |
+| revocation | `credentialStatus` present → fetch the list (local when it is this platform's URL), check the bit; absent → `unknown` | `revocation: { status: "valid" \| "revoked" \| "unknown", checkedAt }` |
+
+Response `{ valid: boolean, checks: {…}, credential: <object without proof> }`;
+`valid` is true only when signature and validity pass and revocation is not
+`revoked`. Malformed input → `400`. No authentication, no persistence.
+
+### Acceptance criteria
+
+1. A newly issued Member credential carries `credentialStatus` with a unique
+   index; `GET /v1/status-lists/1` validates against the W3C shape and its
+   `encodedList` decodes to a bitstring with that bit `0`.
+2. After `revoke`, within 60 s the bit is `1` and
+   `POST /v1/credentials/verify` returns `revocation.status = "revoked"`,
+   `valid = false`, while `signature.valid` stays `true`.
+3. A tampered JWT → `signature.valid = false`; an expired one →
+   `validity.valid = false`; a pre-change credential → `revocation.status = "unknown"`.
+4. Unit tests cover the bitstring encoding round trip (GZIP + base64url,
+   index placement, 131 072 bits), index allocation uniqueness, the three
+   checks and the cache invalidation on revoke.
 
 ---
 
