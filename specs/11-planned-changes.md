@@ -685,8 +685,8 @@ until Clerk test users exist (`e2e/README.md`).
 | CR-3 | ☑ | – | ☑ | log transport by default; SES rollout steps pending |
 | CR-4 | ☑ | ☑ | ☑ | schema `creator/` + index row |
 | CR-5 | ☑ items 1–5 | ☑ item 8 | ☑ | item 7 (Node 22) deferred |
-| CR-6 | ☑ (`develop` ec39863) | ☑ (local commit 7fddcc3, not pushed) | ☑ | admin Clerk users to be created; not deployed |
-| CR-7 | ☑ (`develop` ec39863) | ☑ verify page | ☑ | `API_BASE_URL` must be set per environment before deploy; pre-existing VCs have no status entry |
+| CR-6 | ☑ (`develop` ec39863, deployed to dev and prod 2026-10-29) | ☑ (`main` 7fddcc3) | ☑ | admin Clerk users still to be created |
+| CR-7 | ☑ live: `GET /v1/status-lists/1` and `POST /v1/credentials/verify` on dev and prod | ☑ verify page | ☑ | `API_BASE_URL` set on both hosts; pre-existing VCs have no status entry (`revocation: unknown`) |
 | Tests | ☑ Jest | ☑ Vitest | – | Playwright suite in `e2e/` |
 
 Decisions taken during implementation, to confirm at review:
