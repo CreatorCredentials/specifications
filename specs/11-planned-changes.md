@@ -527,22 +527,26 @@ Status List v1.0** served by the platform and a public verification endpoint.
 
 - One list per environment, id `1`, 131 072 entries, `statusPurpose:
   "revocation"` (profile from `future/revocation-bitstring-status-list.md`).
-- `credential.status_list_index integer UNIQUE NULL` is allocated from a
-  sequence when a credential becomes `SUCCESS` (self-issued at creation,
-  issuer-issued at `verify-signature`, `CREATOR` at creation). Credentials
-  issued before this change have no index and stay uncheckable; the admin
-  list shows them as "no status entry".
+- `credential.status_list_index integer UNIQUE NULL` is drawn **at random**
+  from the free entries (spec §6.5: sequential indices would reveal issuance
+  volume) when a credential becomes `SUCCESS` (self-issued at creation,
+  issuer-issued at `verify-signature`, `CREATOR` at creation). Every index
+  ever handed out is recorded in `credential_status_list_slot`, so none is
+  reused (§6.7), including those of rejected pending requests; the service
+  logs a warning above 90 % occupancy. Credentials issued before this change
+  have no index and stay uncheckable; the admin list shows them as "no
+  status entry".
 - Every newly issued VC object carries
   `credentialStatus: { id: "<APP_BASE_URL>/v1/status-lists/1#<index>", type: "BitstringStatusListEntry", statusPurpose: "revocation", statusListIndex: "<index>", statusListCredential: "<APP_BASE_URL>/v1/status-lists/1" }`
   (added before signing, so it is covered by the proof).
 - `GET /v1/status-lists/1` (public, excluded from the Clerk gate) returns the
   `BitstringStatusListCredential` (`@context` v2, `type: ["VerifiableCredential","BitstringStatusListCredential"]`,
   `issuer: did:web:liccium.com`, `validFrom` now, `validUntil` +24 h,
-  `credentialSubject: { type: "BitstringStatusList", statusPurpose: "revocation", encodedList }`)
+  `credentialSubject: { type: "BitstringStatusList", statusPurpose: "revocation", encodedList, ttl: 60000 }`)
   where `encodedList` is the multibase (`u` + base64url) GZIP of the bitstring
   with a `1` at every index whose credential is `REVOKED`. It is signed with
-  signing path 1 and served as JSON with `proof.jwt` (and raw JWT with
-  `Accept: application/vc+jwt` or `?format=jwt`). The list is rebuilt from the
+  signing path 1 (JOSE header `typ: "vc+jwt"`) and served as JSON with
+  `proof.jwt` (and raw JWT with `Accept: application/vc+jwt` or `?format=jwt`). The list is rebuilt from the
   database at most every 60 s (in-memory cache); `revoke` invalidates it.
 - `Cache-Control: public, max-age=60`.
 
@@ -555,11 +559,13 @@ is) with body `{ "jwt": "<compact JWS>" }` or `{ "credential": { …, "proof": {
 |---|---|---|
 | signature | the JWS `x5c` leaf certificate's public key verifies the compact JWS (`RS256` / `ES256`, raw and legacy DER ECDSA both accepted); the payload equals the credential object | `signature: { valid, issuerDid, certificateSubject }` |
 | validity | `validFrom <= now <= validUntil` | `validity: { valid, validFrom, validUntil }` |
-| revocation | `credentialStatus` present → fetch the list (local when it is this platform's URL), check the bit; absent → `unknown` | `revocation: { status: "valid" \| "revoked" \| "unknown", checkedAt }` |
+| revocation | the validate algorithm of Bitstring Status List §3.2: the entry must have a base-10 string `statusListIndex`, a URL `statusListCredential` and `statusSize` 1 (else `MALFORMED_VALUE_ERROR` / `UNSUPPORTED_STATUS_SIZE`); the list is read locally when it is this platform's URL, otherwise fetched over **https only** from a public address (no redirects, 2 MB cap, 5 s), **its JWS signature verified** against its `x5c` leaf (`STATUS_VERIFICATION_ERROR` otherwise, also when it is not a `BitstringStatusListCredential`, its purpose does not include `revocation`, or it is outside `validFrom`/`validUntil`), expanded (GZIP bomb cap 16 MB), checked for at least 131 072 entries (`STATUS_LIST_LENGTH_ERROR`) and for the index being inside it (`RANGE_ERROR`); then the bit is read. No entry at all → `unknown` | `revocation: { status: "valid" \| "revoked" \| "unknown" \| "error", checkedAt, reason? }` |
 
 Response `{ valid: boolean, checks: {…}, credential: <object without proof> }`;
-`valid` is true only when signature and validity pass and revocation is not
-`revoked`. Malformed input → `400`. No authentication, no persistence.
+`valid` is true only when signature and validity pass and revocation is
+`valid` or `unknown` (no entry to check); `revoked` and `error` make it
+false, `reason` names the failed step. Malformed input → `400`. No
+authentication, no persistence.
 
 ### Acceptance criteria
 
@@ -570,10 +576,19 @@ Response `{ valid: boolean, checks: {…}, credential: <object without proof> }`
    `POST /v1/credentials/verify` returns `revocation.status = "revoked"`,
    `valid = false`, while `signature.valid` stays `true`.
 3. A tampered JWT → `signature.valid = false`; an expired one →
-   `validity.valid = false`; a pre-change credential → `revocation.status = "unknown"`.
+   `validity.valid = false`; a pre-change credential → `revocation.status = "unknown"`
+   with `valid = true`; a foreign list with a bad signature, a wrong purpose,
+   fewer than 131 072 entries or an out-of-range index → `revocation.status = "error"`
+   with the spec's error name and `valid = false`.
 4. Unit tests cover the bitstring encoding round trip (GZIP + base64url,
-   index placement, 131 072 bits), index allocation uniqueness, the three
-   checks and the cache invalidation on revoke.
+   index placement, 131 072 bits), random index allocation with retry and
+   full-list failure, the three checks, every error of the validate algorithm,
+   the https/private-address refusal and the cache invalidation on revoke.
+
+Reviewed against the W3C Bitstring Status List v1.0 text on 2026-10-29;
+not implemented, all optional: `statusSize > 1` with `statusMessage`,
+`statusReference`, point-in-time (`timestamp`) queries, RFC 9457 problem
+details, `415` on unsupported `Accept`.
 
 ---
 
@@ -686,7 +701,7 @@ until Clerk test users exist (`e2e/README.md`).
 | CR-4 | ☑ | ☑ | ☑ | schema `creator/` + index row |
 | CR-5 | ☑ items 1–5 | ☑ item 8 | ☑ | item 7 (Node 22) deferred |
 | CR-6 | ☑ (`develop` ec39863, deployed to dev and prod 2026-10-29) | ☑ (`main` 7fddcc3) | ☑ | admin Clerk users still to be created |
-| CR-7 | ☑ live: `GET /v1/status-lists/1` and `POST /v1/credentials/verify` on dev and prod | ☑ verify page | ☑ | `API_BASE_URL` set on both hosts; pre-existing VCs have no status entry (`revocation: unknown`) |
+| CR-7 | ☑ live: `GET /v1/status-lists/1` and `POST /v1/credentials/verify` on dev and prod; ◐ spec-compliance pass of 2026-10-29 (random indices, slot table, `ttl`, `typ`, verified foreign lists, error reasons) committed, not deployed | ☑ verify page (+ `error` reasons, not deployed) | ☑ | `API_BASE_URL` set on both hosts; pre-existing VCs have no status entry (`revocation: unknown`) |
 | Tests | ☑ Jest | ☑ Vitest | – | Playwright suite in `e2e/` |
 
 Decisions taken during implementation, to confirm at review:
