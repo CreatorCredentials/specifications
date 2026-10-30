@@ -190,7 +190,12 @@ Creator (`/creator/credentials`):
 
 ## CR-2 Issued-credentials page: search and creator identity
 
-**Status: Decided 2026-10-28 (assumed defaults).** The client asked for search
+**Status: Decided 2026-10-28 (assumed defaults); e-mail source confirmed 2026-10-30:**
+the creator e-mail shown on the issued page is the creator's primary e-mail in
+Clerk (the sign-in address), not the `EMAIL` credential. The implementation
+below still reads `credential.email` and is to be switched to the Clerk
+address (batch lookup via `clerkClient.users.getUserList({ userId })`, the
+`EMAIL` credential as fallback). The client asked for search
 and for e-mails on `/issuer/credentials/issued`. Until the client says
 otherwise, "display e-mails" is read as: the full address inline, plus a
 compact table view. Changing this later is a UI-only change.
@@ -275,12 +280,13 @@ one query per request (no N+1).
 
 ## CR-3 E-mail notifications
 
-**Status: Decided 2026-10-28 (assumed defaults).** Assumptions to confirm
-with the client: operator recipients come from configuration
-(`NOTIFY_ADMIN_EMAILS`); issuers are notified at their primary Clerk e-mail;
-the provider is AWS SES (the stack already runs in AWS) with a log-only
-transport for development; creators are additionally notified when a
-credential of theirs is revoked (CR-1). No mail infrastructure exists today:
+**Status: Decided 2026-10-28; confirmed 2026-10-30.** Operator recipients come
+from configuration (`NOTIFY_ADMIN_EMAILS`); issuers and creators are notified
+at their primary Clerk e-mail; the provider is AWS SES with a log-only
+transport for local development; creators are notified when a credential of
+theirs is revoked (CR-1). Sender domains: `creatorcredentials.app` for
+production and `creatorcredentials.dev` for the development environment
+(`NOTIFY_FROM` on each host); the backend API hosts stay on `liccium.network`. No mail infrastructure exists today:
 SES is in sandbox with no verified identity, and the production EC2 instance
 has no instance profile, so the infrastructure steps below are part of the
 rollout, not of the code change.
