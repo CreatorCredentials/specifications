@@ -352,7 +352,11 @@ e-mail of the counterpart.
 
 ## CR-4 `VerifiableCreator` credential
 
-**Status: Decided 2026-10-28 (assumed defaults).** Requested shape:
+**Status: Decided 2026-10-28; confirmed 2026-10-30.** The `issuer` of a
+credential is always the party whose certificate private key signed the VC
+object; for `VerifiableCreator` that is the platform certificate, hence
+`issuer: did:web:liccium.com`, `verifiedBy: liccium.com`, issued when the
+Liccium account is linked. Requested shape:
 
 ```json
 {
