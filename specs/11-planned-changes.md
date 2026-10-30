@@ -193,9 +193,8 @@ Creator (`/creator/credentials`):
 **Status: Decided 2026-10-28 (assumed defaults); e-mail source confirmed 2026-10-30:**
 the creator e-mail shown on the issued page is the creator's primary e-mail in
 Clerk (the sign-in address), not the `EMAIL` credential. The implementation
-below still reads `credential.email` and is to be switched to the Clerk
-address (batch lookup via `clerkClient.users.getUserList({ userId })`, the
-`EMAIL` credential as fallback). The client asked for search
+below reads the Clerk address (batched `getUserList`) with the `EMAIL`
+credential as fallback. The client asked for search
 and for e-mails on `/issuer/credentials/issued`. Until the client says
 otherwise, "display e-mails" is read as: the full address inline, plus a
 compact table view. Changing this later is a UI-only change.
@@ -235,17 +234,14 @@ existing field and adds, per credential:
   "creator": {
     "id": 7,
     "name": "Alice Example",      // user.name, may be null
-    "email": "alice@example.org", // the creator's SUCCESS EMAIL credential, may be null
+    "email": "alice@example.org", // the creator's primary Clerk e-mail, else the SUCCESS EMAIL credential, may be null
     "didKey": "did:key:zDna…"
   },
   "data": { /* unchanged, credentialObject without __* keys */ }
 }
 ```
 
-The creator e-mail comes from the creator's `SUCCESS` `EMAIL` credential
-(`credential.email`), the same source `users.formatters.ts` already uses; the
-service loads `user` + `user.credentials` and the issuer↔creator connection in
-one query per request (no N+1).
+The creator e-mail is the creator's primary Clerk address (the account they sign in with), resolved per response with one batched `users.getUserList({ userId })` call through `ClerkEmailsService`; when Clerk does not return a user, or the lookup fails, the `SUCCESS` `EMAIL` credential (`credential.email`) is shown instead, as before. The revoke response resolves the same way, so the row does not change after a revoke.
 
 ### UI
 
