@@ -383,9 +383,8 @@ Requested shape:
   certificate, like the data supplier templates.
 - The platform does **not** create a Creator credential on connect / export
   any more. Rows the platform issued between 2026-10-29 and this revision
-  stay in the database until the client decides (keep, revoke or delete);
-  they carry `issuer: did:web:liccium.com` and are listed under
-  `verifiableCreator`.
+  are **deleted** by migration `1793700000001` (client decision 2026-11-02);
+  they are the `CREATOR` rows without an issuer.
 
 ### Changes
 
