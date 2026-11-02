@@ -291,7 +291,7 @@ rollout, not of the code change.
 
 | Event | Emitted from | Payload | Recipient | Subject |
 |---|---|---|---|---|
-| `user.created` | `WebhooksService.handleUserCreated` after a **new** user row is created (the `user.updated` fallback and the "already exists" path must not emit) | `{ userId, role, name, email }` | operators (`NOTIFY_ADMIN_EMAILS`) | `New sign-up on Creator Credentials: <name> (<role>)` |
+| `user.created` | after a **new** user row is created, from whichever Clerk event creates it (`user.created`, or the `user.updated` that carries the accepted terms, which in practice is the one; the "already exists" path must not emit) | `{ userId, role, name, email }` | operators (`NOTIFY_ADMIN_EMAILS`) | `New sign-up on Creator Credentials: <name> (<role>)` |
 | `connection.requested` | `UsersService.createConnection` (`POST /v1/users/issuers/:issuerId/confirm-request`) | `{ connectionId, issuerId, creatorId }` | the issuer | `New connection request from <creator name>` |
 | `credential.requested` | the three `createPending…Credential` service methods (`POST /v1/credentials/request`) | `{ credentialId, issuerId, creatorId, credentialType }` | the issuer | `New <type label> credential request from <creator name>` |
 | `credential.revoked` | `CredentialsService.revokeIssuedCredential` (CR-1) | `{ credentialId, issuerId, creatorId, credentialType, reason }` | the creator | `Your <type label> credential was revoked by <issuer name>` |
@@ -348,70 +348,73 @@ e-mail of the counterpart.
 
 ## CR-4 `VerifiableCreator` credential
 
-**Status: Decided 2026-10-28; confirmed 2026-10-30.** The `issuer` of a
-credential is always the party whose certificate private key signed the VC
-object; for `VerifiableCreator` that is the platform certificate, hence
-`issuer: did:web:liccium.com`, `verifiedBy: liccium.com`, issued when the
-Liccium account is linked. Requested shape:
+**Status: Decided 2026-10-28; revised 2026-11-02 after the client's
+clarification.** `VerifiableCreator` is a variant of the data supplier
+credentials for special purposes: it is **offered by an issuer**, requested
+by the creator, and signed with the issuer's own X.509 certificate. It is
+not issued by the platform when a Liccium account is linked (the
+2026-10-28 reading, shipped on 2026-10-29 and withdrawn by this revision).
+Requested shape:
 
 ```json
 {
   "type": ["VerifiableCredential", "VerifiableAttestation", "VerifiableCreator"],
+  "issuer": "did:web:<issuer certificate DID>",
   "credentialSubject": {
-    "id": "did:key:zDnaey3e1ief3tTdayKafvN7ax6XkU6utX9VEBcVTZNKmBz94",
-    "verifiedBy": "liccium.com"
+    "id": "did:key:<the key the creator proved in the keypair challenge>",
+    "verifiedBy": "<issuer domain>"
   }
 }
 ```
 
-### Decision (assumptions to confirm with the client)
+### Decision
 
-- **Platform-issued**, like the Email credential: `issuer: did:web:liccium.com`,
-  signing path 1, no issuer request/accept flow. `verifiedBy` is the platform
-  host (`liccium.com`); the builder takes it as a parameter so an issuer-issued
-  variant (option B in the earlier analysis) would only add a request/accept
-  branch.
-- **Trigger:** the creator's Liccium account is linked, i.e. whenever the
-  Connect credential is (re)issued: `POST /v1/users/did-liccium/connect` and
-  `POST /v1/credentials/export`. The credential is **idempotent**: one
-  `SUCCESS` row per user, returned as is when it already exists.
-- **Subject:** `resolveDidKey(user)`, the same did:key the other self-issued
-  credentials use. No PII in the subject, so `termsOfUse` is
-  `{ type: 'PresentationPolicy', confidentialityLevel: 'public', pii: 'none' }`.
-- Not offered by issuers, not requestable by creators, not shown in the
-  request flow.
+- **Issuer-issued, certificate-signed.** The flow is the one of the data
+  supplier credentials: the issuer lists `CREATOR` in `credentials_to_issue`;
+  the creator completes a keypair challenge and requests the credential from
+  that issuer (`POST /v1/credentials/request` with `credentialType: "CREATOR"`);
+  the request stores the proven did:key and issues the platform-signed
+  keypair verification (EKVC) that supports it; the issuer accepts by signing
+  the credential with its certificate key (`accept` → `accept/verify-signature`).
+- `issuer` is the DID taken from the issuer's certificate; `verifiedBy` is
+  the issuer's domain, else the host of that DID. Subject = the proven
+  did:key. No PII, so `termsOfUse` stays `{ PresentationPolicy, public, none }`.
+- The template is offered only while the issuer holds an imported
+  certificate, like the data supplier templates.
+- The platform does **not** create a Creator credential on connect / export
+  any more. Rows the platform issued between 2026-10-29 and this revision
+  stay in the database until the client decides (keep, revoke or delete);
+  they carry `issuer: did:web:liccium.com` and are listed under
+  `verifiableCreator`.
 
 ### Changes
 
-- Backend: `CredentialType.Creator = 'CREATOR'`; migration
-  `ADD VALUE IF NOT EXISTS 'CREATOR'` on `credential_credential_type_enum`
-  plus the partial unique index `idx_credential_unique_creator`
-  (`user_id` where `credential_type = 'CREATOR'`);
-  `generateCreatorCredentialObjectAndJWS(user, verifiedBy)` in
-  `credentials.helpers.ts` (type marker `VerifiableCreator`, schema id
-  `…/verification-credentials/creator/schema.json`);
-  `CredentialsService.ensureCreatorCredential(user)` called from the two
-  trigger points; formatter case `formatCreatorCredential` →
-  `{ id, status, type: 'CREATOR', data: { verifiedBy, credentialObject } }`;
-  the `Credentials.ts` union; `verifiableCreator` bucket in
-  `GET /v1/credentials/creator` and in the `/export` response.
-- UI: enum value, union, the three icon maps, `cards.json`
-  `credential.types.creator.{title: "Verified Creator", description}`,
-  `CredentialDetailsCard` shows `verifiedBy`, the creator's issued list shows
-  the card, download file name. No template, no request-flow entry.
-- Schema repo: `json-schema/verification-credentials/creator/schema.json` +
-  `example.json` (envelope copied from `email/`, subject `id` + `verifiedBy`),
-  a row in `json-schema/README.md`, a section in
-  `03-verifiable-credentials-catalog.md` when shipped.
+- Backend: `user_credentials_to_issue_enum` and `template_template_type_enum`
+  gain `CREATOR` (migration `1793700000000`); `CredentialTemplateType.Creator`;
+  the three certificate-signed types share one request / acceptance /
+  verification flow in `CredentialsService` (`createPendingCertSignedCredential`,
+  `initiateCertSignedAcceptance`, `verifyCertSignedAcceptance`, kind table
+  `CERT_SIGNED_KINDS`); `buildCreatorCredentialObject(subjectDidKey, issuer)`;
+  `ensureCreatorCredential` and its two triggers removed; the formatter reads
+  `verifiedBy` from the signed object.
+- UI: `CredentialTemplateType.Creator` in the keypair-required set and the
+  template → type map, template card "Verified Creator" in the issuer's
+  templates list and the creator's request flow, card texts.
+- Operations: enabling an issuer is a database update until an admin UI
+  exists:
+  `update "user" set credentials_to_issue = array_append(credentials_to_issue, 'CREATOR') where id = <issuer id> and not ('CREATOR' = any(credentials_to_issue));`
 
 ### Acceptance criteria
 
-1. After `POST /v1/users/did-liccium/connect` the creator's bundle contains
-   exactly one `CREATOR` credential whose object validates against
-   `creator/schema.json`; calling connect again does not create a second row.
-2. `POST /v1/credentials/export` returns it under `verifiableCreator`.
-3. The creator's credentials page shows a "Verified Creator" card with
-   `verifiedBy`.
+1. An issuer with `CREATOR` in `credentials_to_issue` and an imported
+   certificate shows the "Verified Creator" template; without the
+   certificate it does not.
+2. A creator who completed the keypair challenge can request it; the issuer
+   accepts it by signing; the issued JWT has the issuer's certificate in
+   `x5c`, `issuer` = certificate DID, `credentialSubject.id` = the proven
+   did:key, `verifiedBy` = issuer domain, and a `credentialStatus` entry.
+3. `POST /v1/users/did-liccium/connect` and `POST /v1/credentials/export`
+   no longer create a `CREATOR` row.
 
 ---
 
