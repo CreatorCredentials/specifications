@@ -540,8 +540,7 @@ Status List v1.0** served by the platform and a public verification endpoint.
   ever handed out is recorded in `credential_status_list_slot`, so none is
   reused (§6.7), including those of rejected pending requests; the service
   logs a warning above 90 % occupancy. Credentials issued before this change
-  have no index and stay uncheckable; the admin list shows them as "no
-  status entry".
+  have no index; see [Credentials issued before CR-7](#credentials-issued-before-cr-7).
 - Every newly issued VC object carries
   `credentialStatus: { id: "<APP_BASE_URL>/v1/status-lists/1#<index>", type: "BitstringStatusListEntry", statusPurpose: "revocation", statusListIndex: "<index>", statusListCredential: "<APP_BASE_URL>/v1/status-lists/1" }`
   (added before signing, so it is covered by the proof).
@@ -573,6 +572,35 @@ Response `{ valid: boolean, checks: {…}, credential: <object without proof> }`
 false, `reason` names the failed step. Malformed input → `400`. No
 authentication, no persistence.
 
+### Credentials issued before CR-7
+
+**Decided 2026-11-02.** A credential issued before the status list carries no
+`credentialStatus` entry, and the signed object held by the creator cannot be
+amended. Revocation of such a credential is therefore visible to a third
+party only through this platform. Two mechanisms, both without a migration:
+
+- **Verify falls back to the platform record.** When the credential carries
+  no status entry, `POST /v1/credentials/verify` looks the token up in the
+  `credential` table (exact match on the stored compact JWS) and answers
+  `valid` / `revoked` from the record. The revocation check now carries
+  `source: "status-list" | "platform-record"`. A token the platform never
+  issued stays `unknown` (`valid = true`); a failing lookup is `error` with
+  `STATUS_RETRIEVAL_ERROR`. Credentials with a status entry never consult the
+  record.
+- **Registry of legacy revocations.** `GET /v1/revoked-credentials` (public,
+  `Cache-Control: public, max-age=60`) returns a platform-signed document
+  `{ id, type: "RevokedCredentialsRegistry", issuer: did:web:liccium.com, generatedAt, description, statusListCredential, revokedCredentials: [{ id: "urn:uuid:…", issuer, revokedAt }], proof: { type: "JwtProof2020", jwt } }`
+  listing every `REVOKED` credential without a `status_list_index` by its own
+  `id`; `?format=jwt` or `Accept: application/jwt` returns the compact JWS.
+  It is not a W3C mechanism: only verifiers told about it will read it, and
+  the status list named in `statusListCredential` covers all other
+  credentials.
+
+Re-issuing legacy credentials with a status entry (the only way to make them
+checkable by standard verifiers) is a separate decision: it needs the creator
+to replace the file wherever it was published, and the old file stays valid
+for anyone who does not consult this platform.
+
 ### Acceptance criteria
 
 1. A newly issued Member credential carries `credentialStatus` with a unique
@@ -582,8 +610,9 @@ authentication, no persistence.
    `POST /v1/credentials/verify` returns `revocation.status = "revoked"`,
    `valid = false`, while `signature.valid` stays `true`.
 3. A tampered JWT → `signature.valid = false`; an expired one →
-   `validity.valid = false`; a pre-change credential → `revocation.status = "unknown"`
-   with `valid = true`; a foreign list with a bad signature, a wrong purpose,
+   `validity.valid = false`; a pre-change credential unknown to the platform →
+   `revocation.status = "unknown"` with `valid = true`, a pre-change credential
+   the platform revoked → `"revoked"` with `source = "platform-record"`; a foreign list with a bad signature, a wrong purpose,
    fewer than 131 072 entries or an out-of-range index → `revocation.status = "error"`
    with the spec's error name and `valid = false`.
 4. Unit tests cover the bitstring encoding round trip (GZIP + base64url,
